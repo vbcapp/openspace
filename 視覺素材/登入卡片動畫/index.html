@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入卡片動畫</title>
+    <style>
+        @font-face {
+            font-family: 'Hatten';
+            src: url('HATTEN.TTF') format('truetype');
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ========== 主容器（以卡片為中心） ========== */
+        .container {
+            position: relative;
+            width: 39vmin;
+            aspect-ratio: 640 / 605;
+        }
+
+        /* ========== 卡片本體（無數字） ========== */
+        .card-border {
+            position: absolute;
+            inset: 0;
+            background: #e60012;
+            clip-path: polygon(37% 0%, 63% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+            z-index: 2;
+        }
+
+        .card-image {
+            position: absolute;
+            inset: 0;
+            clip-path: polygon(39% 2.8%, 61% 2.8%, 97% 86%, 90% 97%, 10% 97%, 3% 86%);
+            z-index: 3;
+        }
+
+        .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 15%;
+        }
+
+        /* ========== 數據破壞感遮罩 ========== */
+        .card-glitch {
+            position: absolute;
+            inset: 0;
+            clip-path: polygon(39% 2.8%, 61% 2.8%, 97% 86%, 90% 97%, 10% 97%, 3% 86%);
+            z-index: 3;
+            pointer-events: none;
+            background: rgba(230, 0, 18, 0.06);
+            filter: url(#noise);
+            opacity: 0.35;
+        }
+
+        /* ========== 數字編號（左上） ========== */
+        .player-number {
+            position: absolute;
+            top: 5%;
+            right: 102%;
+            font-family: 'Hatten', sans-serif;
+            font-size: 8vmin;
+            color: #e60012;
+            line-height: 0.9;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        /* ========== 玩家名字（斜線條紋正上方） ========== */
+        .player-name {
+            position: absolute;
+            top: 5.4%;
+            left: 75.3%;
+            transform: translateY(-100%);
+            font-family: 'Hatten', sans-serif;
+            font-size: 5.46vmin;
+            color: #e60012;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        /* ========== 斜線條紋 — 7.登陸頁零件（右上） ========== */
+        .stripes {
+            position: absolute;
+            top: 5.4%;
+            left: 75.3%;
+            width: 22%;
+            z-index: 4;
+        }
+        .stripes img { width: 100%; display: block; }
+
+        /* ========== 紅色橫條 — 6.登陸頁零件（數字編號下方） ========== */
+        .red-bar {
+            position: absolute;
+            top: 33%;
+            right: 102%;
+            width: 50%;
+            z-index: 1;
+        }
+        .red-bar img { width: 100%; display: block; }
+
+        /* ========== 十字準星 — 9.登陸頁零件（左下角之下） ========== */
+        .crosshair {
+            position: absolute;
+            top: 95%;
+            left: 2%;
+            width: 13.2%;
+            z-index: 5;
+        }
+        .crosshair img { width: 100%; display: block; }
+
+        /* ========== 同心圓 — 8.登陸頁零件（右下角） ========== */
+        .circles {
+            position: absolute;
+            top: 86%;
+            left: 100%;
+            width: 27.5%;
+            z-index: 4;
+            transform: translate(-50%, -50%);
+        }
+        .circles img { width: 100%; display: block; }
+
+        /* ========== 底部橫條 — 11.登陸頁零件（底部中間之下） ========== */
+        .bottom-bar {
+            position: absolute;
+            top: 105%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            z-index: 4;
+        }
+        .bottom-bar img { width: 100%; display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- SVG 雜訊濾鏡 -->
+    <svg width="0" height="0" style="position:absolute">
+        <filter id="noise">
+            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="4" stitchTiles="stitch" result="noisy"/>
+            <feColorMatrix type="saturate" values="0" in="noisy" result="mono"/>
+            <feBlend in="SourceGraphic" in2="mono" mode="multiply"/>
+        </filter>
+    </svg>
+
+    <div class="container">
+        <!-- 裝飾：紅色橫條（卡片後方） -->
+        <div class="red-bar"><img src="6.登陸頁零件.png" alt=""></div>
+
+        <!-- 玩家名字 -->
+        <div class="player-name">Wayne</div>
+
+        <!-- 裝飾：斜線條紋（卡片前方） -->
+        <div class="stripes"><img src="7.登陸頁零件.png" alt=""></div>
+
+        <!-- 卡片本體 -->
+        <div class="card-border"></div>
+        <div class="card-image">
+            <img src="001.png" alt="001">
+        </div>
+
+        <!-- 數據破壞感遮罩 -->
+        <div class="card-glitch"></div>
+
+        <!-- 數字編號 -->
+        <div class="player-number">001</div>
+
+        <!-- 裝飾：十字準星（卡片前方） -->
+        <div class="crosshair"><img src="9.登陸頁零件.png" alt=""></div>
+
+        <!-- 裝飾：同心圓（卡片前方） -->
+        <div class="circles"><img src="8.登陸頁零件.png" alt=""></div>
+
+        <!-- 裝飾：底部橫條（卡片前方） -->
+        <div class="bottom-bar"><img src="11.登陸頁零件.png" alt=""></div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,286 @@
+/* ================================================================
+   effects.css — Glitch / CRT / 雜訊 / 動畫特效
+   ================================================================ */
+
+/* ── CRT 掃描線覆蓋 ── */
+.fx-crt {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: var(--z-crt);
+  box-shadow: var(--shadow-inset-dark);
+}
+
+/* ── 文字 Glitch 效果 ── */
+.fx-text-glitch {
+  position: relative;
+}
+
+.fx-text-glitch::before,
+.fx-text-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.fx-text-glitch::before {
+  color: var(--color-cyber-cyan);
+  z-index: -1;
+  transform: translate(-2px, 2px);
+  animation: glitch-text-cyan 2s infinite linear alternate-reverse;
+}
+
+.fx-text-glitch::after {
+  color: var(--color-blood-red);
+  z-index: -2;
+  transform: translate(2px, -2px);
+  animation: glitch-text-red 3s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-text-cyan {
+  0%   { clip-path: inset(20% 0 80% 0); }
+  20%  { clip-path: inset(60% 0 10% 0); transform: translate(-4px, 1px); }
+  40%  { clip-path: inset(40% 0 50% 0); }
+  60%  { clip-path: inset(80% 0 5% 0);  transform: translate(2px, -2px); }
+  80%  { clip-path: inset(10% 0 70% 0); }
+  100% { clip-path: inset(30% 0 20% 0); transform: translate(-2px, 2px); }
+}
+
+@keyframes glitch-text-red {
+  0%   { clip-path: inset(10% 0 60% 0); }
+  20%  { clip-path: inset(30% 0 20% 0); transform: translate(2px, -2px); }
+  40%  { clip-path: inset(70% 0 10% 0); }
+  60%  { clip-path: inset(20% 0 50% 0); transform: translate(-2px, 2px); }
+  80%  { clip-path: inset(50% 0 30% 0); }
+  100% { clip-path: inset(5% 0 80% 0);  transform: translate(4px, -1px); }
+}
+
+/* ── 死寂雜訊 ── */
+.fx-noise {
+  background:
+    repeating-radial-gradient(#000 0 0.0001%, #fff 0 0.0002%) 50% 0 / 2500px 2500px,
+    repeating-conic-gradient(#000 0 0.0001%, #fff 0 0.0002%) 60% 60% / 2500px 2500px;
+  background-blend-mode: difference;
+  animation: noise-shift 0.2s infinite alternate;
+  opacity: 0.15;
+}
+
+@keyframes noise-shift {
+  100% { background-position: 50% 0, 60% 50%; }
+}
+
+/* ── 呼吸燈脈衝 ── */
+.fx-pulse {
+  animation: pulse-breathe 1.5s infinite alternate;
+}
+
+@keyframes pulse-breathe {
+  from {
+    opacity: 0.1;
+  }
+  to {
+    opacity: 0.3;
+    border-color: var(--color-border-strong);
+  }
+}
+
+/* 綠色在線呼吸燈 */
+.fx-pulse-green {
+  animation: pulse-green 1.2s infinite alternate;
+}
+
+@keyframes pulse-green {
+  from {
+    box-shadow: 0 0 5px rgba(0, 255, 102, 0.3);
+    opacity: 0.7;
+  }
+  to {
+    box-shadow: 0 0 20px rgba(0, 255, 102, 0.8);
+    opacity: 1;
+  }
+}
+
+/* ── RGB 分裂 ── */
+.fx-rgb-split {
+  animation: rgb-split 0.2s steps(2) infinite;
+}
+
+@keyframes rgb-split {
+  0% {
+    transform: translate(0);
+    filter: drop-shadow(-3px 0 var(--color-cyber-cyan))
+            drop-shadow(3px 0 var(--color-cyber-magenta));
+  }
+  50% {
+    transform: translate(-2px, 2px);
+    filter: drop-shadow(3px 0 var(--color-cyber-cyan))
+            drop-shadow(-3px 0 var(--color-cyber-magenta));
+  }
+  100% {
+    transform: translate(2px, -2px);
+    filter: drop-shadow(-3px 0 var(--color-cyber-cyan))
+            drop-shadow(3px 0 var(--color-cyber-magenta));
+  }
+}
+
+/* ── 崩潰淘汰動畫 ── */
+.fx-crash {
+  animation:
+    crash-shake 0.4s var(--ease-crash) both,
+    crash-color 0.4s linear both;
+}
+
+@keyframes crash-shake {
+  10%, 90% { transform: translate3d(-2px, 0, 0) scale(1.1); }
+  20%, 80% { transform: translate3d(4px, 0, 0) scale(1.1) skewX(10deg); }
+  30%, 50%, 70% { transform: translate3d(-6px, 0, 0) scale(1.1) skewX(-10deg); }
+  40%, 60% { transform: translate3d(6px, 0, 0) scale(1.1); }
+}
+
+@keyframes crash-color {
+  0%   { filter: invert(1) hue-rotate(90deg) brightness(2); }
+  100% { filter: invert(0) brightness(0); }
+}
+
+/* ── 警告 Banner ── */
+.fx-warning-banner {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  background: rgba(255, 0, 60, 0.8);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 8vh;
+  text-align: center;
+  letter-spacing: var(--tracking-widest);
+  padding: 1vh 0;
+  transform: translateY(-50%) scaleY(0);
+  z-index: var(--z-banner);
+  mix-blend-mode: hard-light;
+  pointer-events: none;
+  transition: transform 0.1s;
+}
+
+
+/* ── 頁面轉場 ── */
+.page-enter {
+  animation: page-fade-in var(--duration-normal) var(--ease-out);
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 暈映漸層 ── */
+.vignette {
+  background: radial-gradient(circle at center, rgba(30,0,0,0.8) 0%, rgba(0,0,0,1) 80%);
+}
+
+/* ── 閃爍干擾帶掃描線 ── */
+.fx-scanline-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+  opacity: 0;
+}
+
+.fx-scanline-glitch.is-active {
+  opacity: 1;
+}
+
+.fx-scanline-glitch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    rgba(255, 0, 60, 0.15) 1px,
+    rgba(255, 0, 60, 0.3) 2px,
+    transparent 3px,
+    transparent 4px
+  );
+  top: -14px;
+  animation: fx-scanline-sweep 1.2s linear forwards;
+}
+
+.fx-scanline-glitch::after {
+  content: '';
+  position: absolute;
+  left: -2%;
+  width: 104%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  mix-blend-mode: overlay;
+  box-shadow:
+    0 -4px 8px rgba(255, 0, 60, 0.3),
+    0 4px 8px rgba(0, 243, 255, 0.2);
+  top: -14px;
+  animation: fx-scanline-sweep-core 1.2s linear forwards;
+}
+
+@keyframes fx-scanline-sweep {
+  0%   { top: -14px; opacity: 0; transform: translateX(0); }
+  5%   { opacity: 1; }
+  20%  { transform: translateX(3px); }
+  25%  { transform: translateX(-2px); }
+  35%  { transform: translateX(1px); }
+  40%  { transform: translateX(-4px); }
+  55%  { transform: translateX(2px); }
+  60%  { transform: translateX(0); }
+  70%  { transform: translateX(-3px); }
+  75%  { transform: translateX(1px); }
+  90%  { opacity: 1; }
+  100% { top: calc(100% + 14px); opacity: 0; transform: translateX(0); }
+}
+
+@keyframes fx-scanline-sweep-core {
+  0%   { top: -14px; opacity: 0; transform: translateX(0); }
+  5%   { opacity: 0.8; }
+  20%  { transform: translateX(-3px); opacity: 1; }
+  25%  { transform: translateX(2px); opacity: 0.6; }
+  35%  { transform: translateX(-1px); opacity: 1; }
+  40%  { transform: translateX(4px); opacity: 0.7; }
+  55%  { transform: translateX(-2px); opacity: 1; }
+  60%  { transform: translateX(0); opacity: 0.5; }
+  70%  { transform: translateX(3px); opacity: 1; }
+  75%  { transform: translateX(-1px); }
+  90%  { opacity: 0.8; }
+  100% { top: calc(100% + 14px); opacity: 0; transform: translateX(0); }
+}
+
+/* ── 無障礙：減少動畫 ── */
+@media (prefers-reduced-motion: reduce) {
+  .fx-text-glitch::before,
+  .fx-text-glitch::after,
+  .fx-noise,
+  .fx-pulse,
+  .fx-pulse-green,
+  .fx-rgb-split,
+  .fx-crash,
+  .fx-scanline-glitch {
+    animation: none !important;
+  }
+}

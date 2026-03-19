@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI末日議會 - 矩陣登入流</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --blood-red: #ff003c;
+            --dark-red: #1a0005;
+            --cyber-cyan: #00f3ff;
+            --cyber-magenta: #ff00e6;
+        }
+
+        body {
+            background-color: #020002;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Oswald', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            background-image:
+                linear-gradient(rgba(255, 0, 60, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 60, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .aspect-container {
+            position: relative;
+            width: 100vw;
+            max-width: 177.78vh;
+            aspect-ratio: 16 / 9;
+            background: radial-gradient(circle at center, rgba(30, 0, 0, 0.8) 0%, rgba(0, 0, 0, 1) 80%);
+            overflow: hidden;
+            box-shadow: 0 0 100px rgba(255, 0, 60, 0.1) inset;
+        }
+
+        .crt-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+        }
+
+        /* 網格系統 */
+        .matrix-grid {
+            position: absolute;
+            inset: 6% 4%;
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            grid-template-rows: repeat(7, 1fr);
+            gap: 0.5vh;
+            z-index: 20;
+        }
+
+        /* 基礎格子樣式 */
+        .cell {
+            position: relative;
+            background: rgba(20, 0, 0, 0.4);
+            border: 1px solid rgba(255, 0, 60, 0.2);
+            overflow: hidden;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            transition: filter 0.3s;
+        }
+
+        .cell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* 頭像樣式 */
+        .avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(100%) sepia(100%) hue-rotate(-50deg) saturate(500%) contrast(1.2);
+            opacity: 0.8;
+            mix-blend-mode: hard-light;
+        }
+
+        .player-id {
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.4vh;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 0 4px;
+            border-radius: 2px;
+            text-shadow: 0 0 5px var(--blood-red);
+            z-index: 10;
+        }
+
+        /* Hover 時解除封印變回方形 */
+        .cell.active-player:hover {
+            clip-path: none !important;
+            border-color: #fff;
+            background: #000;
+            transform: scale(2.5);
+            z-index: 999 !important;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .cell.active-player:hover .avatar-img {
+            filter: none;
+            opacity: 1;
+            mix-blend-mode: normal;
+        }
+
+        .cell.active-player:hover .player-id {
+            color: var(--cyber-cyan);
+            text-shadow: 0 0 5px var(--cyber-cyan);
+            bottom: 4px;
+            font-size: 1.8vh;
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        /* 標題保留區 (強制顯示故障雜訊) */
+        .title-reserved {
+            background: transparent !important;
+            border: 1px solid rgba(255, 0, 60, 0.2) !important;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%) !important;
+        }
+
+        .title-reserved .avatar-img,
+        .title-reserved .player-id {
+            display: none;
+        }
+
+        /* 死寂雜訊 (待機/故障/淘汰狀態) */
+        .dead-noise {
+            background:
+                repeating-radial-gradient(#000 0 0.0001%, #fff 0 0.0002%) 50% 0 / 2500px 2500px,
+                repeating-conic-gradient(#000 0 0.0001%, #fff 0 0.0002%) 60% 60% / 2500px 2500px;
+            background-blend-mode: difference;
+            animation: static-noise-anim 0.2s infinite alternate;
+            opacity: 0.15;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            border-color: #333;
+        }
+
+        /* 玩家降落前的待機光點 (呼吸效應) */
+        .waiting-slot {
+            box-shadow: inset 0 0 10px rgba(255, 0, 60, 0.2);
+            animation: pulse-wait 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-wait {
+            from {
+                opacity: 0.1;
+            }
+
+            to {
+                opacity: 0.3;
+                border-color: rgba(255, 0, 60, 0.5);
+            }
+        }
+
+        @keyframes static-noise-anim {
+            100% {
+                background-position: 50% 0, 60% 50%;
+            }
+        }
+
+        /* 隨機故障閃爍 */
+        .glitch-active {
+            animation: rgb-split 0.2s steps(2) infinite;
+        }
+
+        @keyframes rgb-split {
+            0% {
+                transform: translate(0);
+                filter: drop-shadow(-3px 0 var(--cyber-cyan)) drop-shadow(3px 0 var(--cyber-magenta));
+            }
+
+            50% {
+                transform: translate(-2px, 2px);
+                filter: drop-shadow(3px 0 var(--cyber-cyan)) drop-shadow(-3px 0 var(--cyber-magenta));
+            }
+
+            100% {
+                transform: translate(2px, -2px);
+                filter: drop-shadow(-3px 0 var(--cyber-cyan)) drop-shadow(3px 0 var(--cyber-magenta));
+            }
+        }
+
+        /* 淘汰崩潰動畫 */
+        .fatal-crash {
+            animation: crash-shake 0.4s cubic-bezier(.36, .07, .19, .97) both, crash-color 0.4s linear both;
+            clip-path: none !important;
+        }
+
+        @keyframes crash-shake {
+
+            10%,
+            90% {
+                transform: translate3d(-2px, 0, 0) scale(1.1);
+            }
+
+            20%,
+            80% {
+                transform: translate3d(4px, 0, 0) scale(1.1) skewX(10deg);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translate3d(-6px, 0, 0) scale(1.1) skewX(-10deg);
+            }
+
+            40%,
+            60% {
+                transform: translate3d(6px, 0, 0) scale(1.1);
+            }
+        }
+
+        @keyframes crash-color {
+            0% {
+                filter: invert(1) hue-rotate(90deg) brightness(2);
+            }
+
+            100% {
+                filter: invert(0) brightness(0);
+            }
+        }
+
+        /* ==== 數據流：飛行元素 ==== */
+        .flying-cell {
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: #000;
+            border: 2px solid #ff003c;
+            border-radius: 8px;
+            /* 預設為完整方形，加上一點圓角 */
+            z-index: 1000;
+            pointer-events: none;
+            /* 飛行中不觸發 Hover */
+        }
+
+        /* 文字 Glitch */
+        .ui-text {
+            font-family: 'Anton', sans-serif;
+            text-shadow: 2px 2px 0px var(--void-black), -1px -1px 0 var(--blood-red);
+        }
+
+        .text-glitch-anim {
+            position: relative;
+        }
+
+        .text-glitch-anim::before,
+        .text-glitch-anim::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .text-glitch-anim::before {
+            color: var(--cyber-cyan);
+            z-index: -1;
+            transform: translate(-2px, 2px);
+            animation: text-glitch-1 2s infinite linear alternate-reverse;
+        }
+
+        .text-glitch-anim::after {
+            color: var(--blood-red);
+            z-index: -2;
+            transform: translate(2px, -2px);
+            animation: text-glitch-2 3s infinite linear alternate-reverse;
+        }
+
+        @keyframes text-glitch-1 {
+            0% {
+                clip-path: inset(20% 0 80% 0);
+            }
+
+            20% {
+                clip-path: inset(60% 0 10% 0);
+                transform: translate(-4px, 1px);
+            }
+
+            40% {
+                clip-path: inset(40% 0 50% 0);
+            }
+
+            60% {
+                clip-path: inset(80% 0 5% 0);
+                transform: translate(2px, -2px);
+            }
+
+            80% {
+                clip-path: inset(10% 0 70% 0);
+            }
+
+            100% {
+                clip-path: inset(30% 0 20% 0);
+                transform: translate(-2px, 2px);
+            }
+        }
+
+        @keyframes text-glitch-2 {
+            0% {
+                clip-path: inset(10% 0 60% 0);
+            }
+
+            20% {
+                clip-path: inset(30% 0 20% 0);
+                transform: translate(2px, -2px);
+            }
+
+            40% {
+                clip-path: inset(70% 0 10% 0);
+            }
+
+            60% {
+                clip-path: inset(20% 0 50% 0);
+                transform: translate(-2px, 2px);
+            }
+
+            80% {
+                clip-path: inset(50% 0 30% 0);
+            }
+
+            100% {
+                clip-path: inset(5% 0 80% 0);
+                transform: translate(4px, -1px);
+            }
+        }
+
+        #warning-banner {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            background: rgba(255, 0, 60, 0.8);
+            color: white;
+            font-family: 'Anton', sans-serif;
+            font-size: 8vh;
+            text-align: center;
+            letter-spacing: 0.2em;
+            padding: 1vh 0;
+            transform: translateY(-50%) scaleY(0);
+            z-index: 100;
+            mix-blend-mode: hard-light;
+            pointer-events: none;
+            transition: transform 0.1s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="aspect-container">
+        <div class="crt-overlay"></div>
+        <div id="warning-banner">SYSTEM SINGULARITY DETECTED</div>
+
+        <div class="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-red-800 z-40"></div>
+        <div class="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-red-800 z-40"></div>
+        <div class="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-red-800 z-40"></div>
+        <div class="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-red-800 z-40"></div>
+
+        <!-- 靜態 UI 疊層 -->
+        <div class="absolute inset-0 p-6 md:p-8 z-50 pointer-events-none flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <div class="mt-[-1vh] ml-[-1vh]">
+                    <h1 class="text-5xl md:text-7xl font-bold tracking-widest text-white ui-text text-glitch-anim"
+                        data-text="AI末日議會">AI末日議會</h1>
+                    <h2
+                        class="text-sm md:text-lg font-mono tracking-[0.3em] mt-1 text-[var(--cyber-cyan)] animate-pulse">
+                        MATRIX_MONITORING_ACTIVE</h2>
+                </div>
+                <div class="text-right opacity-40 mix-blend-screen">
+                    <div class="text-4xl md:text-6xl font-bold text-[var(--blood-red)] ui-text tracking-wider text-glitch-anim"
+                        data-text="19:00 - 24:00">19:00 - 24:00</div>
+                    <div class="text-xs font-mono text-red-400">SESSION: 3/28 // SINGULARITY</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 矩陣網格 -->
+        <div class="matrix-grid" id="matrix"></div>
+    </div>
+
+    <script>
+        const matrixContainer = document.getElementById('matrix');
+        const warningBanner = document.getElementById('warning-banner');
+
+        // ===== 圖片設定 =====
+        const IMAGE_FOLDER = 'avatars';           // 圖片資料夾路徑（相對於 index.html）
+        const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];  // 嘗試順序
+        const FALLBACK_TO_API = true;             // 全部副檔名都找不到時，是否用 DiceBear 替代
+
+        // 圖片載入輔助：依序嘗試不同副檔名，找到能載入的就用
+        function loadPlayerImage(img, playerId) {
+            const paddedId = playerId.toString().padStart(3, '0');
+            let extIndex = 0;
+
+            function tryNext() {
+                if (extIndex < IMAGE_EXTENSIONS.length) {
+                    img.src = `${IMAGE_FOLDER}/${paddedId}.${IMAGE_EXTENSIONS[extIndex]}`;
+                    extIndex++;
+                } else if (FALLBACK_TO_API) {
+                    img.src = `https://api.dicebear.com/7.x/pixel-art/svg?seed=Matrix${playerId}`;
+                    img.onerror = null;
+                }
+            }
+
+            img.onerror = tryNext;
+            tryNext();
+        }
+
+        const TOTAL_COLS = 16;
+        const TOTAL_ROWS = 7;
+        const TOTAL_CELLS = TOTAL_COLS * TOTAL_ROWS; // 112
+        const TOTAL_PLAYERS = 100;
+
+        const activePlayers = []; // 已經降落且存活的玩家
+        let playerTargets = {}; // { playerId: DOMElement } 存儲目標降落位置
+
+        // 標題保留區 (第一排前 6 格)
+        const titleReservedIndices = [0, 1, 2, 3, 4, 5];
+
+        // 登入隊列 (1 到 100 號，打亂順序)
+        let spawnQueue = Array.from({ length: TOTAL_PLAYERS }, (_, i) => i + 1);
+        spawnQueue.sort(() => Math.random() - 0.5);
+
+        // 1. 初始化空網格 (分配坐標)
+        function initMatrix() {
+            let availableSlots = [];
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (!titleReservedIndices.includes(i)) availableSlots.push(i);
+            }
+
+            // 106 可用格中，隨機選 100 格當作玩家預定地 (這樣會產生 6 個隨機損壞格)
+            availableSlots.sort(() => Math.random() - 0.5);
+            const playerPositions = availableSlots.slice(0, TOTAL_PLAYERS);
+
+            // 【關鍵修正】：將選出的 100 個位置由小到大 (左到右、上到下) 重新排序
+            // 這樣接下來綁定 ID 時，畫面上的號碼就會是完美照順序排列的
+            playerPositions.sort((a, b) => a - b);
+
+            // 替位置綁定玩家 ID (用來作降落導航)
+            let currentId = 1;
+            let positionMap = {};
+            playerPositions.forEach(posIndex => {
+                positionMap[posIndex] = currentId++;
+            });
+
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell dead-noise'; // 預設全部都是死寂雜訊
+
+                if (titleReservedIndices.includes(i)) {
+                    cell.classList.add('title-reserved');
+                } else if (positionMap[i]) {
+                    // 標記為待機網格
+                    cell.classList.add('waiting-slot');
+                    const targetId = positionMap[i];
+                    cell.dataset.targetId = targetId;
+                    playerTargets[targetId] = cell; // 記錄這個 ID 該飛去哪裡
+                }
+                matrixContainer.appendChild(cell);
+            }
+        }
+
+        // 2. 觸發單一玩家的「數據流降落」動畫
+        function spawnNextPlayer() {
+            if (spawnQueue.length === 0) {
+                // 所有玩家降落完畢，開始常態監視與淘汰
+                setTimeout(startNormalOperations, 2000);
+                return;
+            }
+
+            const playerId = spawnQueue.pop();
+            const targetCell = playerTargets[playerId];
+            if (!targetCell) return;
+
+            // 取得目標格子的絕對座標與大小
+            const rect = targetCell.getBoundingClientRect();
+            const cellW = rect.width;
+            const cellH = rect.height;
+
+            // 建立飛行元素 (尺寸與目標格子一模一樣)
+            const flyingCell = document.createElement('div');
+            flyingCell.className = 'flying-cell flex flex-col items-center justify-end overflow-hidden';
+            flyingCell.style.width = `${cellW}px`;
+            flyingCell.style.height = `${cellH}px`;
+
+            const img = document.createElement('img');
+            img.className = 'avatar-img';
+            loadPlayerImage(img, playerId);
+
+            const idLabel = document.createElement('div');
+            idLabel.className = 'player-id';
+            idLabel.innerText = playerId.toString().padStart(3, '0');
+
+            flyingCell.appendChild(img);
+            flyingCell.appendChild(idLabel);
+            document.body.appendChild(flyingCell);
+
+            // 動畫座標計算
+            const startX = window.innerWidth + 100; // 畫面右側外
+            const centerY = window.innerHeight / 2 - cellH / 2;
+            const centerX = window.innerWidth / 2 - cellW / 2;
+            const finalX = rect.left;
+            const finalY = rect.top;
+
+            // 階段一：從右側飛入，在中央定格並極度放大發光 (此時是完整方形)
+            // 將耗能的 filter: drop-shadow 改為硬體加速效能較好的 boxShadow
+            const enterAnim = flyingCell.animate([
+                { transform: `translate(${startX}px, ${centerY}px) scale(0.5) rotate(15deg)`, boxShadow: '0 0 0px 0px rgba(255,0,60,0)', opacity: 0 },
+                { transform: `translate(${centerX}px, ${centerY}px) scale(4.5) rotate(0deg)`, boxShadow: '0 0 50px 20px rgba(255,0,60,0.8)', opacity: 1 }
+            ], { duration: 800, easing: 'ease-out', fill: 'forwards' });
+
+            enterAnim.onfinish = () => {
+                // 在中心確實停留 1.2 秒 (1200ms) 讓觀眾看清楚
+                setTimeout(() => {
+                    // 階段二：從中央發射，往左淡出飛入並嵌合進矩陣目標位置
+                    const dockAnim = flyingCell.animate([
+                        {
+                            transform: `translate(${centerX}px, ${centerY}px) scale(4.5)`,
+                            boxShadow: '0 0 50px 20px rgba(255,0,60,0.8)',
+                            clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', // 完整方形
+                            opacity: 1
+                        },
+                        {
+                            transform: `translate(${finalX}px, ${finalY}px) scale(1)`,
+                            boxShadow: '0 0 0px 0px rgba(255,0,60,0)',
+                            clipPath: 'polygon(50% 0%, 50% 0%, 100% 100%, 0% 100%)', // 變形成三角形
+                            opacity: 0.2 // 飛入時產生淡出效果
+                        }
+                    ], { duration: 800, easing: 'cubic-bezier(0.25, 1, 0.5, 1)', fill: 'forwards' });
+
+                    dockAnim.onfinish = () => {
+                        // 降落完成：移除飛行物
+                        flyingCell.remove();
+
+                        // 啟動矩陣格子
+                        targetCell.classList.remove('dead-noise', 'waiting-slot');
+                        targetCell.classList.add('active-player');
+                        targetCell.appendChild(img.cloneNode(true)); // 注入圖片
+                        targetCell.appendChild(idLabel.cloneNode(true)); // 注入標籤
+
+                        // 加入存活列表
+                        activePlayers.push(targetCell);
+
+                        // 降落瞬間閃爍一下邊框
+                        targetCell.style.borderColor = '#fff';
+                        setTimeout(() => targetCell.style.borderColor = '', 200);
+                    };
+                }, 1200); // 在中央強制停留 1200ms
+            };
+
+            // 大幅拉長發射間隔到 800ms，減少同時飛行的 DOM 數量，解決掉幀卡頓問題
+            setTimeout(spawnNextPlayer, 800);
+        }
+
+        // 3. 常態系統操作 (干擾與淘汰)
+        function triggerRandomFlicker() {
+            if (activePlayers.length === 0) return;
+            const target = activePlayers[Math.floor(Math.random() * activePlayers.length)];
+
+            target.classList.add('glitch-active');
+            setTimeout(() => { target.classList.remove('glitch-active'); }, Math.random() * 300 + 100);
+            setTimeout(triggerRandomFlicker, Math.random() * 1000 + 500);
+        }
+
+        function triggerElimination() {
+            if (activePlayers.length === 0) return;
+
+            if (Math.random() > 0.9) {
+                warningBanner.style.transform = 'translateY(-50%) scaleY(1)';
+                setTimeout(() => { warningBanner.style.transform = 'translateY(-50%) scaleY(0)'; }, 150);
+                setTimeout(() => { warningBanner.style.transform = 'translateY(-50%) scaleY(1)'; }, 250);
+                setTimeout(() => { warningBanner.style.transform = 'translateY(-50%) scaleY(0)'; }, 400);
+            }
+
+            const index = Math.floor(Math.random() * activePlayers.length);
+            const target = activePlayers[index];
+            activePlayers.splice(index, 1);
+
+            target.classList.remove('active-player');
+            target.classList.add('fatal-crash');
+
+            setTimeout(() => {
+                target.classList.remove('fatal-crash');
+                target.innerHTML = ''; // 清除圖片與數字
+                target.classList.add('dead-noise');
+            }, 400);
+
+            setTimeout(triggerElimination, Math.random() * 1500 + 1500);
+        }
+
+        function startNormalOperations() {
+            triggerRandomFlicker();
+            setTimeout(triggerRandomFlicker, 1000); // 兩條閃爍執行緒
+            setTimeout(triggerElimination, 2000); // 所有人登入後 2 秒開始處決
+        }
+
+        // ====== 程式執行入口 ======
+        initMatrix();
+
+        // 延遲 1 秒後，開始「數據流登入」大戲
+        setTimeout(spawnNextPlayer, 1000);
+
+    </script>
+</body>
+
+</html>

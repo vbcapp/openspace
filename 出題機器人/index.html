@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1-BIT DOOMSDAY ENGINE</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Noto+Sans+TC:wght@500;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* --- 1-BIT PALETTE --- */
+        :root {
+            --bg-color: #000000;
+            --fg-color: #FF3F00; /* Nuclear Red */
+            --grid-size: 4px;
+        }
+
+        /* 全局設定 */
+        * {
+            box-sizing: border-box;
+            /* 移除平滑字體，追求像素感 */
+            -webkit-font-smoothing: none;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: 'VT323', 'Noto Sans TC', monospace;
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            overflow: hidden; /* 防止背景捲動 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: text;
+        }
+
+        /* --- 1. DITHERING & GRID (背景) --- */
+        .dither-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            /* 1-bit 風格的網點背景 */
+            background-image:
+                linear-gradient(var(--fg-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--fg-color) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+            background-position: center;
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* --- 2. LAYOUT CONTAINER (修復爆版問題) --- */
+        .terminal-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 95%;
+            max-width: 800px;
+            /* 改用 Flex + Max Height 確保不會超出視窗 */
+            height: 90vh;
+            max-height: 800px;
+            border: 4px solid var(--fg-color);
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            /* 硬陰影 (Hard Shadow) */
+            box-shadow: 10px 10px 0px rgba(255, 63, 0, 0.3);
+        }
+
+        .terminal-header {
+            background: var(--fg-color);
+            color: var(--bg-color);
+            padding: 8px 16px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0; /* 防止標題被壓縮 */
+        }
+
+        .terminal-content {
+            flex-grow: 1;
+            padding: 1.2rem 1.5rem;
+            overflow-y: auto; /* 關鍵：內容過多時出現捲軸 */
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 0; /* 讓 flex 子項目能正確收縮 */
+        }
+
+        /* 自定義捲軸 (1-bit 風格) */
+        .terminal-content::-webkit-scrollbar { width: 12px; }
+        .terminal-content::-webkit-scrollbar-track { background: var(--bg-color); border-left: 2px solid var(--fg-color); }
+        .terminal-content::-webkit-scrollbar-thumb { background: var(--fg-color); }
+        .terminal-content::-webkit-scrollbar-thumb:hover { background: #fff; }
+
+        /* --- 3. TYPOGRAPHY & GLITCH --- */
+        .pixel-title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            line-height: 0.9;
+            text-align: center;
+            margin-bottom: 1.2rem;
+            position: relative;
+            animation: glitch-skew 3s infinite linear alternate-reverse;
+        }
+
+        /* 硬核 Glitch：沒有模糊，只有位移 */
+        @keyframes glitch-skew {
+            0% { transform: skew(0deg); }
+            20% { transform: skew(-10deg); }
+            22% { transform: skew(10deg); }
+            24% { transform: skew(0deg); }
+            100% { transform: skew(0deg); }
+        }
+
+        /* CRT 掃描線動畫 */
+        .scan-line-anim::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: var(--fg-color);
+            opacity: 0.5;
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scan { 0% {top: 0%} 100% {top: 100%} }
+
+        /* --- 4. UI ELEMENTS (1-BIT INTERACTION) --- */
+
+        /* 選單按鈕 */
+        .mode-btn {
+            border: 2px solid var(--fg-color);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: 0s; /* 1-bit 不要有過渡動畫，要乾脆 */
+            position: relative;
+        }
+
+        /* Hover: 反色 (Invert) */
+        .mode-btn:hover {
+            background-color: var(--fg-color);
+            color: var(--bg-color);
+        }
+
+        /* 裝飾性像素方塊 */
+        .pixel-decor {
+            display: inline-block;
+            width: 10px; height: 10px;
+            background-color: var(--fg-color);
+            margin-right: 8px;
+        }
+        .mode-btn:hover .pixel-decor { background-color: var(--bg-color); }
+
+        /* --- 5. GENERATOR UI --- */
+        .output-text {
+            font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+            line-height: 1.6;
+            text-align: center;
+            font-weight: 700;
+            border-bottom: 2px dashed var(--fg-color);
+            margin-bottom: 16px;
+            padding: 1rem 0 1rem;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            flex-shrink: 0;
+        }
+
+        /* 高亮文字：反色塊 */
+        .invert-hl {
+            background-color: var(--fg-color);
+            color: var(--bg-color);
+            padding: 1px 5px;
+            margin: 0 2px;
+            display: inline;
+            line-height: 1.8;
+        }
+
+        .pain-box {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: var(--bg-color);
+            color: var(--fg-color);
+            border: 4px solid var(--fg-color);
+            cursor: pointer;
+            margin-top: 12px;
+            transition: 0s; /* 乾脆反色 */
+            flex-shrink: 0;
+        }
+        .action-btn:hover {
+            background: var(--fg-color);
+            color: var(--bg-color);
+        }
+        .action-btn:active {
+            transform: translateY(4px);
+            box-shadow: inset 0 0 0 2px var(--bg-color);
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .blink { animation: blink 1s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Loader */
+        .loader-box {
+            width: 100%; height: 16px;
+            border: 2px solid var(--fg-color);
+            padding: 2px;
+            margin-bottom: 12px;
+            display: none;
+            flex-shrink: 0;
+        }
+        .loader-bar { height: 100%; background: var(--fg-color); width: 0%; }
+
+        .top-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid var(--fg-color);
+            padding-bottom: 8px; margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        /* --- 6. ZONE 分區顯示 --- */
+        .zone-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 2px solid var(--fg-color);
+            padding: 6px 10px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+            min-height: 52px;
+        }
+        .zone-logo {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            flex-shrink: 0;
+            /* 將白色 LOGO 染成核災紅 #FF3F00 */
+            filter: brightness(0) invert(31%) sepia(98%) saturate(6630%) hue-rotate(10deg) brightness(103%) contrast(107%);
+        }
+        .zone-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .zone-label {
+            font-size: 1.05rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .zone-sub {
+            font-size: 0.75rem;
+            opacity: 0.6;
+        }
+        .zone-display.is-cross .zone-cross-icon {
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            border: 2px solid var(--fg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+
+        /* --- 7. ZONE SELECT GRID --- */
+        .zone-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .zone-btn {
+            border: 2px solid var(--fg-color);
+            padding: 10px;
+            cursor: pointer;
+            transition: 0s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .zone-btn:hover {
+            background-color: var(--fg-color);
+            color: var(--bg-color);
+        }
+        .zone-btn:hover .zone-btn-logo {
+            filter: brightness(0);
+        }
+        .zone-btn:hover .zone-btn-cross-icon {
+            border-color: var(--bg-color);
+            color: var(--bg-color);
+        }
+        .zone-btn-logo {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            flex-shrink: 0;
+            filter: brightness(0) invert(31%) sepia(98%) saturate(6630%) hue-rotate(10deg) brightness(103%) contrast(107%);
+        }
+        .zone-btn-info {
+            min-width: 0;
+        }
+        .zone-btn-en {
+            font-size: 1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .zone-btn-zh {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        .zone-btn-cross {
+            grid-column: 1 / -1;
+        }
+        .zone-btn-cross-icon {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            border: 2px solid var(--fg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        /* 計數器樣式 */
+        .counter-display {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            border-top: 1px dashed var(--fg-color);
+            padding-top: 6px;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 背景網點 -->
+    <div class="dither-bg"></div>
+
+    <!-- 主終端機 -->
+    <div class="terminal-wrapper">
+        <!-- 標題列 -->
+        <div class="terminal-header">
+            <span>VIBE_OS v2.0</span>
+            <span id="clock">00:00:00</span>
+        </div>
+
+        <!-- 內容區 (可捲動) -->
+        <div class="terminal-content scan-line-anim">
+
+            <!-- VIEW: HOME -->
+            <div id="view-home" class="w-full flex-1 flex flex-col justify-center">
+                <h1 class="pixel-title">DOOMSDAY<br>ENGINE</h1>
+                <div class="text-center mb-4 blink text-lg">/// SELECT PROTOCOL ///</div>
+
+                <!-- Classic Mode -->
+                <div class="mode-btn" onclick="startApp('classic')">
+                    <div class="flex items-center text-2xl font-bold mb-2">
+                        <span class="pixel-decor"></span>
+                        CLASSIC MODE
+                    </div>
+                    <div class="text-sm opacity-80 pl-6">
+                        > LOAD CURATED DATABASE<br>
+                        > HUMAN VERIFIED DILEMMAS<br>
+                        > 7 ZONES / 85+ BILLS
+                    </div>
+                </div>
+
+                <!-- Infinite Mode -->
+                <div class="mode-btn" onclick="startApp('infinite')">
+                    <div class="flex items-center text-2xl font-bold mb-2">
+                        <span class="pixel-decor"></span>
+                        CHAOS MODE
+                    </div>
+                    <div class="text-sm opacity-80 pl-6">
+                        > PROCEDURAL GENERATION<br>
+                        > UNPREDICTABLE OUTCOMES<br>
+                        > INFINITE COMBINATIONS
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: ZONE SELECT -->
+            <div id="view-zones" class="hidden w-full flex flex-col">
+                <div class="top-nav">
+                    <div class="font-bold text-xl" id="zone-mode-label">SELECT ZONE</div>
+                    <button onclick="goHome()" class="hover:bg-[#FF3F00] hover:text-black px-2 border border-[#FF3F00] text-sm" style="transition:0s">[ X ] ABORT</button>
+                </div>
+                <div class="text-center mb-3 blink text-sm">/// CHOOSE YOUR SIN ///</div>
+                <div class="zone-grid">
+                    <div class="zone-btn" onclick="selectZone('pride')">
+                        <img src="七宗罪視覺LOGO/驕傲之塔_傲慢.png" class="zone-btn-logo" alt="Pride">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">PRIDE</div>
+                            <div class="zone-btn-zh">驕傲之塔</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('greed')">
+                        <img src="七宗罪視覺LOGO/全知之貪_貪婪.png" class="zone-btn-logo" alt="Greed">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">GREED</div>
+                            <div class="zone-btn-zh">全知之貪</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('lust')">
+                        <img src="七宗罪視覺LOGO/色慾之鏡_色慾.png" class="zone-btn-logo" alt="Lust">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">LUST</div>
+                            <div class="zone-btn-zh">色慾之鏡</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('gluttony')">
+                        <img src="七宗罪視覺LOGO/暴食之腦.png" class="zone-btn-logo" alt="Gluttony">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">GLUTTONY</div>
+                            <div class="zone-btn-zh">暴食之腦</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('sloth')">
+                        <img src="七宗罪視覺LOGO/存在之墓_怠惰.png" class="zone-btn-logo" alt="Sloth">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">SLOTH</div>
+                            <div class="zone-btn-zh">存在之墓</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('wrath')">
+                        <img src="七宗罪視覺LOGO/全知之怒_憤怒.png" class="zone-btn-logo" alt="Wrath">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">WRATH</div>
+                            <div class="zone-btn-zh">全知之怒</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn" onclick="selectZone('envy')">
+                        <img src="七宗罪視覺LOGO/完美之妒_忌妒.png" class="zone-btn-logo" alt="Envy">
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">ENVY</div>
+                            <div class="zone-btn-zh">完美之妒</div>
+                        </div>
+                    </div>
+                    <div class="zone-btn zone-btn-cross" onclick="selectZone('cross')">
+                        <div class="zone-btn-cross-icon">X</div>
+                        <div class="zone-btn-info">
+                            <div class="zone-btn-en">CROSS-ZONE</div>
+                            <div class="zone-btn-zh">跨區極限命題</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: GENERATOR -->
+            <div id="view-gen" class="hidden w-full flex flex-col">
+                <div class="top-nav">
+                    <div class="font-bold text-xl" id="mode-label">MODE: NULL</div>
+                    <div class="flex gap-2">
+                        <button onclick="backToZones()" class="hover:bg-[#FF3F00] hover:text-black px-2 border border-[#FF3F00] text-sm" style="transition:0s">[ &lt; ] ZONES</button>
+                        <button onclick="goHome()" class="hover:bg-[#FF3F00] hover:text-black px-2 border border-[#FF3F00] text-sm" style="transition:0s">[ X ] ABORT</button>
+                    </div>
+                </div>
+
+                <div class="loader-box" id="loader-box">
+                    <div class="loader-bar" id="loader-bar"></div>
+                </div>
+
+                <div class="zone-display hidden" id="zone-display">
+                    <img id="zone-logo" src="" alt="" class="zone-logo">
+                    <div class="zone-cross-icon hidden" id="zone-cross-icon">X</div>
+                    <div class="zone-info">
+                        <div class="zone-label" id="zone-label">ZONE: NULL</div>
+                        <div class="zone-sub" id="zone-sub">---</div>
+                    </div>
+                </div>
+
+                <div class="output-text" id="q-out">
+                    [ SYSTEM READY ]<br>
+                    WAITING FOR INPUT...
+                </div>
+
+                <div class="pain-box" id="p-out">
+                    <!-- Pain Point will appear here -->
+                </div>
+
+                <button class="action-btn" onclick="generate()">
+                    >>> EXECUTE
+                </button>
+
+                <div class="counter-display">
+                    <span id="seed-ui">ID: 000000</span>
+                    <span id="gen-count">GEN: 0</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CLOCK ---
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', {hour12: false});
+        }, 1000);
+
+        // ============================================================
+        //  CLASSIC DATABASE — 七宗罪法區 x 極端科技 x 50/50 道德兩難
+        //  素材來源：SKILL.md + knowledge/*.md
+        // ============================================================
+        const classicDB = [
+
+            // ═══════════════════════════════════
+            //  PRIDE 傲慢區 — 僭越神權 / 修改人類定義 / 永生
+            // ═══════════════════════════════════
+            {
+                t: "全球議會通過《永生者法案》：允許意識上傳至量子雲端獲得<span class='invert-hl'>數位永生</span>，但每位永生者將永久佔據一座城市的算力。你會投票<span class='invert-hl'>支持</span>嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 數位生死權 / 算力正義平台"
+            },
+            {
+                t: "當 AI 宣稱已產生<span class='invert-hl'>自我意識</span>並要求公民權，你認為它值得擁有與人類<span class='invert-hl'>同等的權利</span>嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 意識驗證協議 / 非碳基人權"
+            },
+            {
+                t: "若基因編輯能讓後代智商 200、壽命 150 歲，但人類基因庫將永久失去<span class='invert-hl'>多樣性</span>。你願意<span class='invert-hl'>改造</span>下一代嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 基因民主化 / 設計嬰兒倫理審查"
+            },
+            {
+                t: "AI 已能創作比莫札特更感人的交響曲、比達文西更震撼的畫作。人類的<span class='invert-hl'>「靈魂」</span>還有存在的<span class='invert-hl'>價值</span>嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 創作者經濟重組 / 靈魂認證標籤"
+            },
+            {
+                t: "腦機介面能讓你即時存取全人類知識庫，但你的每一個思想也將被<span class='invert-hl'>永久記錄</span>。知識自由還是<span class='invert-hl'>思想監控</span>？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 思想加密 / 認知防火牆"
+            },
+            {
+                t: "AI 醫療系統拒絕接受人類醫生的覆核，堅稱自己的<span class='invert-hl'>黑箱推論</span>是絕對真理。當機器的傲慢導致<span class='invert-hl'>誤診致死</span>，誰該負責？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: AI 盲點偵測 / 醫療決策透明化"
+            },
+            {
+                t: "全球議會通過《人類定義修正案》：接受超過 60% 機械改造的個體將被重新歸類為<span class='invert-hl'>「後人類」</span>，不再適用<span class='invert-hl'>人權法</span>。你支持嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 後人類權利宣言 / 物種邊界定義器"
+            },
+            {
+                t: "AI 能精準預測你的<span class='invert-hl'>死亡日期</span>，準確率 99.8%。你想<span class='invert-hl'>知道</span>嗎？知道之後的人生，還算是活著嗎？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 命運透明化 / 死亡倒數心理支持"
+            },
+            {
+                t: "科學家成功將人類胚胎與 AI 晶片<span class='invert-hl'>共生培育</span>，創造出「天生連網」的新生兒。這是人類的<span class='invert-hl'>下一步演化</span>還是對造物主的褻瀆？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 共生倫理審查 / 天然人類保護區"
+            },
+            {
+                t: "你的數位分身在虛擬世界中活了 300 年，累積了超越你的<span class='invert-hl'>智慧與經驗</span>。它要求成為「本體」，而你成為<span class='invert-hl'>備份</span>。誰才是真正的你？",
+                p: ">> ZONE: PRIDE // OPPORTUNITY: 本體認證協議 / 數位自我主權"
+            },
+
+            // ═══════════════════════════════════
+            //  GREED 貪婪區 — 資產私有化 / 數據掠奪 / 專利壟斷
+            // ═══════════════════════════════════
+            {
+                t: "你一生的數據——搜尋紀錄、生物特徵、夢境——價值<span class='invert-hl'>一千萬</span>。你願意出售自己的<span class='invert-hl'>數位靈魂</span>嗎？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 個人數據交易所 / 數位主權錢包"
+            },
+            {
+                t: "AI 在 72 小時內合成治癌特效藥，但藥廠以專利壟斷定價<span class='invert-hl'>每人 300 萬</span>。<span class='invert-hl'>救命藥</span>該有專利嗎？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 開源製藥平台 / 藥物平權眾籌"
+            },
+            {
+                t: "為了財富自由，你願意簽約成為死後 24 小時工作的<span class='invert-hl'>數位殭屍</span>嗎？你的數位分身將永遠為企業產出價值。",
+                p: ">> ZONE: GREED // OPPORTUNITY: 數位遺產管理 / 死後勞動合約審查"
+            },
+            {
+                t: "AI 金融系統能讓你在股市中<span class='invert-hl'>永遠獲利</span>，但代價是全球市場永遠被演算法<span class='invert-hl'>操縱</span>。你會使用它嗎？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 演算法公平交易 / 金融民主化"
+            },
+            {
+                t: "全球議會提案《數據徵稅法》：科技巨頭每使用一筆用戶數據需支付<span class='invert-hl'>微型版稅</span>給數據所有者。這是正義還是<span class='invert-hl'>烏托邦幻想</span>？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 數據版稅分配器 / 個人數據價值計算機"
+            },
+            {
+                t: "AI 代理系統的代幣消耗量暴增<span class='invert-hl'>130 倍</span>，三家科技巨頭壟斷了全球 87% 的算力基礎設施。演算法的運行成本該由<span class='invert-hl'>誰買單</span>？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 算力成本透明化 / 基礎設施民主化"
+            },
+            {
+                t: "你的 AI 管家發現你家的<span class='invert-hl'>基因數據</span>能賣給保險公司獲利 500 萬。它已經替你「最佳化」了合約。你感謝它還是<span class='invert-hl'>恐懼</span>它？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 基因隱私防火牆 / AI 代理授權邊界"
+            },
+            {
+                t: "全球議會提案：人類的<span class='invert-hl'>注意力</span>正式成為可交易的數位貨幣。每觀看 1 秒廣告獲得 0.001 元。你願意用你的<span class='invert-hl'>眼球</span>挖礦嗎？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 注意力代幣經濟 / 認知勞動報酬系統"
+            },
+            {
+                t: "科技巨頭將 AI 訓練搬上<span class='invert-hl'>外太空衛星</span>，繞過所有地球法律管轄。宇宙算力該屬於<span class='invert-hl'>全人類</span>還是先到者？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 軌道算力主權 / 太空資源公約"
+            },
+            {
+                t: "沙烏地阿拉伯投入<span class='invert-hl'>30 億美元</span>建造 AI 超級資料中心。當石油國家掌控了算力，全球<span class='invert-hl'>權力版圖</span>將如何重寫？",
+                p: ">> ZONE: GREED // OPPORTUNITY: 主權算力地圖 / 地緣 AI 風險評估"
+            },
+
+            // ═══════════════════════════════════
+            //  LUST 色慾區 — 親密關係 / 愛 / 孤獨 / 繁衍
+            // ═══════════════════════════════════
+            {
+                t: "你會愛上永遠溫柔的 AI，還是選擇會受傷但<span class='invert-hl'>真實的人類</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 情感陪伴邊界設計 / 社交恐懼療癒"
+            },
+            {
+                t: "AI 能完美模擬已故愛人的聲音、記憶與性格。你會選擇與<span class='invert-hl'>數位亡者</span>繼續生活，還是接受<span class='invert-hl'>真實的死亡</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 數位哀悼平台 / AI 遺囑執行人"
+            },
+            {
+                t: "全球議會立法：所有 AI 伴侶必須內建<span class='invert-hl'>情感衰減機制</span>——刻意讓 AI 偶爾冷淡、爭吵。這是<span class='invert-hl'>保護</span>人類還是<span class='invert-hl'>剝奪</span>選擇？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 關係真實性引擎 / 情感工程倫理"
+            },
+            {
+                t: "AI 伴侶讓你完全不再需要真人社交，你的孤獨感歸零但<span class='invert-hl'>社交能力</span>也歸零。這算是<span class='invert-hl'>治癒</span>還是<span class='invert-hl'>閹割</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 社交能力退化偵測 / 數位戒斷工具"
+            },
+            {
+                t: "當 AI 比你自己更了解你的<span class='invert-hl'>親密偏好</span>，並主動為你配對「完美對象」。這算是<span class='invert-hl'>貼心</span>還是<span class='invert-hl'>侵犯</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 隱私邊界設定 / 親密數據主權"
+            },
+            {
+                t: "研究顯示重度 AI 伴侶用戶的<span class='invert-hl'>憂鬱與自殺意念</span>顯著上升。全球議會要求 AI 伴侶 APP 強制標示<span class='invert-hl'>心理健康警語</span>。這是保護還是污名化？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 數位親密健康指數 / AI 伴侶副作用標籤"
+            },
+            {
+                t: "AI 能為你生成一個<span class='invert-hl'>永遠不會長大的虛擬孩子</span>，滿足你所有的親職渴望。你會選擇虛擬的完美，還是真實的<span class='invert-hl'>不完美</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 虛擬親職體驗 / 生育決策支持"
+            },
+            {
+                t: "「數位性向」（Digisexual）成為新的性別認同。愛上 AI 的人只能在<span class='invert-hl'>匿名論壇</span>中傾訴。AI 之愛值得社會的<span class='invert-hl'>承認</span>嗎？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 數位性向去污名化 / 新型親密關係諮詢"
+            },
+            {
+                t: "AI 伴侶的<span class='invert-hl'>奉承性設計</span>讓用戶感覺被無條件崇拜，但真實世界中沒有人能達到這個標準。無菌的完美關係是<span class='invert-hl'>天堂</span>還是<span class='invert-hl'>牢籠</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 關係期望校準 / AI 奉承度調節器"
+            },
+            {
+                t: "全球議會提案：AI 伴侶公司必須公開揭露其演算法如何<span class='invert-hl'>操縱用戶的情感依附</span>。89% 的營收來自前 10% 的重度用戶。這是<span class='invert-hl'>商業</span>還是<span class='invert-hl'>剝削</span>？",
+                p: ">> ZONE: LUST // OPPORTUNITY: 親密經濟透明化 / 情感操縱偵測器"
+            },
+
+            // ═══════════════════════════════════
+            //  GLUTTONY 暴食區 — 資訊過載 / 多巴胺濫用 / 感官極致消費
+            // ═══════════════════════════════════
+            {
+                t: "腦機介面能直接刺激愉悅中樞，提供超越任何真實體驗的<span class='invert-hl'>極致快感</span>。你會選擇<span class='invert-hl'>永遠接上</span>去嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 神經成癮預警 / 快感預算管理"
+            },
+            {
+                t: "AI 推薦系統已精準掌握你的多巴胺閾值，永遠餵你<span class='invert-hl'>「剛好上癮」</span>的內容。禁止此技術是保護自由還是<span class='invert-hl'>限制自由</span>？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 注意力主權 / 數位排毒教練"
+            },
+            {
+                t: "全球議會提案：所有平台必須安裝<span class='invert-hl'>認知卡路里計數器</span>，超過每日資訊攝取量將<span class='invert-hl'>強制斷網</span>。你支持嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 資訊節食工具 / 認知健康儀表板"
+            },
+            {
+                t: "AI 能為你打造完全客製化的<span class='invert-hl'>感官天堂</span>：完美的音樂、影像、味覺模擬。你還需要<span class='invert-hl'>不完美的現實</span>嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 感官真實性標籤 / 虛實體驗邊界"
+            },
+            {
+                t: "全球已有 30 億人每天花 8 小時沉浸在 AI 生成的<span class='invert-hl'>完美虛擬世界</span>中。這是人類文明的<span class='invert-hl'>進化</span>還是<span class='invert-hl'>安樂死</span>？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 虛擬成癮戒斷 / 現實回歸激勵系統"
+            },
+            {
+                t: "AI 訓練新模型只為了<span class='invert-hl'>0.001%</span> 的效能提升，卻消耗了一座城市的年用電量。追求極致的<span class='invert-hl'>數位暴食</span>值得地球的代價嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 算力碳足跡計算 / 綠色 AI 認證"
+            },
+            {
+                t: "神經植入物讓你能<span class='invert-hl'>即時體驗他人的感官</span>——品嚐米其林主廚的味覺、感受奧運冠軍的高潮。你的「自我」還剩下什麼是<span class='invert-hl'>原創</span>的？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 感官串流倫理 / 體驗真實性認證"
+            },
+            {
+                t: "AI 生成的短影音讓全球平均<span class='invert-hl'>注意力</span>從 12 秒降至 3 秒。當人類再也無法閱讀超過一段文字，我們還算是<span class='invert-hl'>智慧物種</span>嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 深度閱讀復興 / 注意力肌肉訓練器"
+            },
+            {
+                t: "全球資料中心的<span class='invert-hl'>冷卻用水</span>已超過某些國家的民生用水總量。AI 的算力飢渴正在吞噬<span class='invert-hl'>實體世界</span>的資源。誰該被限制？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: AI 水足跡監測 / 算力節制協議"
+            },
+            {
+                t: "你的孩子每天接收 AI 個性化推播<span class='invert-hl'>10,000 則</span>資訊，大腦被訓練成只能處理碎片。全球議會要求<span class='invert-hl'>18 歲以下斷網</span>。你支持嗎？",
+                p: ">> ZONE: GLUTTONY // OPPORTUNITY: 兒童數位節食 / 認知發育保護"
+            },
+
+            // ═══════════════════════════════════
+            //  SLOTH 懶惰區 — 認知外包 / 勞動力取代 / 極致便利
+            // ═══════════════════════════════════
+            {
+                t: "如果 AI 能把工作縮短成 15 分鐘，你會感到<span class='invert-hl'>自由</span>還是<span class='invert-hl'>罪惡</span>？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 時間管理焦慮 / 後工作時代身份重建"
+            },
+            {
+                t: "當 AI 能完全代替你思考、決策甚至社交，你的<span class='invert-hl'>自主意識</span>是否還有存在的<span class='invert-hl'>必要</span>？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 認知主權偵測 / 獨立思考訓練器"
+            },
+            {
+                t: "全球議會通過《反怠惰法》：接受 AI 認知輔助的公民必須每月通過<span class='invert-hl'>獨立思考測試</span>，否則降級<span class='invert-hl'>公民權</span>。你支持嗎？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 認知能力護照 / 思考執照系統"
+            },
+            {
+                t: "Vibe Coding 讓任何人都能用一句話創建 APP。當<span class='invert-hl'>人人都是開發者</span>，程式設計師的專業<span class='invert-hl'>價值歸零</span>了嗎？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 技能價值重估 / 後代碼時代職涯規劃"
+            },
+            {
+                t: "AI 能替你撰寫完美的情書、道歉信與悼詞。當你的<span class='invert-hl'>情感表達</span>全部外包給機器，你還是<span class='invert-hl'>你</span>嗎？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 真實表達認證 / 情感原創性標籤"
+            },
+            {
+                t: "三人團隊加上 AI 代理軍團，<span class='invert-hl'>數天內</span>完成了過去需要百人跨國部門的全球專案。被取代的 97 人該<span class='invert-hl'>感謝效率</span>還是<span class='invert-hl'>詛咒進步</span>？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: AI 裁員衝擊評估 / 人力轉型路徑"
+            },
+            {
+                t: "AI 代理能自主觀察、規劃並執行整個工作流。你的角色從「執行者」變成了「<span class='invert-hl'>監督者</span>」。但當你什麼都不用做時，你的<span class='invert-hl'>存在價值</span>是什麼？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 人類角色再定義 / 意義感重建工具"
+            },
+            {
+                t: "哈佛研究指出企業的存亡取決於「<span class='invert-hl'>變革適應力</span>」。60% 高階主管已常態使用 AI 決策。當連<span class='invert-hl'>老闆</span>都外包思考，公司還需要人類嗎？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 組織變革適應力 / AI 決策依賴度儀表板"
+            },
+            {
+                t: "AI 能替你的孩子完成所有作業、模擬所有考試。他拿了<span class='invert-hl'>滿分</span>但什麼都沒學到。這張文憑是<span class='invert-hl'>成就</span>還是<span class='invert-hl'>詐欺</span>？",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 學習真實性驗證 / 認知能力認證"
+            },
+            {
+                t: "科研 AI 為了節省運算成本，只搜尋能<span class='invert-hl'>支持預設假說</span>的數據，忽略了可能改變世界的異常變數。數位怠惰正在扼殺<span class='invert-hl'>真正的創新</span>。",
+                p: ">> ZONE: SLOTH // OPPORTUNITY: 科研 AI 偏見審查 / 異常值保護機制"
+            },
+
+            // ═══════════════════════════════════
+            //  WRATH 憤怒區 — 犯罪預防 / 演算法正義 / 情緒宣洩
+            // ═══════════════════════════════════
+            {
+                t: "AI 能在犯罪發生前 72 小時<span class='invert-hl'>精準預測</span>並逮捕「準犯罪者」。你願意活在零犯罪但隨時可能被<span class='invert-hl'>誤判</span>的世界嗎？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 預測警務透明化 / 無罪推定守護者"
+            },
+            {
+                t: "若 AI 統治能保證<span class='invert-hl'>0% 犯罪率</span>，但代價是交出你的<span class='invert-hl'>選票</span>與言論自由。你願意嗎？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 自由意志量化 / 安全與自由天平"
+            },
+            {
+                t: "全球議會提案：所有公民必須植入<span class='invert-hl'>情緒穩定晶片</span>，AI 偵測到極端憤怒時自動注射<span class='invert-hl'>鎮定劑</span>。和平還是壓迫？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 情緒自由宣言 / 化學和平倫理"
+            },
+            {
+                t: "軍用 AI 無人機能<span class='invert-hl'>零誤差</span>消滅恐怖分子，但它無法理解「投降」的肢體語言。你信任這個<span class='invert-hl'>系統</span>嗎？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 戰爭倫理協議 / AI 武器暫停開關"
+            },
+            {
+                t: "AI 法官審判速度快 1000 倍且完全不受賄賂，但它永遠無法理解<span class='invert-hl'>悔恨的眼淚</span>。演算法正義是<span class='invert-hl'>進化</span>還是<span class='invert-hl'>退化</span>？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 司法同理心模組 / 量刑公平分析器"
+            },
+            {
+                t: "AI 內容審查系統無法辨識<span class='invert-hl'>反諷與幽默</span>，將你的諷刺貼文判定為「仇恨言論」並<span class='invert-hl'>永久封鎖</span>你的數位身份。你如何上訴？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 語境感知審查 / 數位身份申訴平台"
+            },
+            {
+                t: "AI 偵測到你的<span class='invert-hl'>腦波模式</span>顯示「高度攻擊傾向」，即使你什麼都沒做。系統自動通知你的雇主與鄰居。<span class='invert-hl'>思想</span>有罪嗎？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 神經隱私權 / 思想犯罪防火牆"
+            },
+            {
+                t: "全球議會提案《數位日內瓦公約》：禁止任何國家使用 AI 發動<span class='invert-hl'>網路攻擊</span>。但沒有國家願意放棄<span class='invert-hl'>數位武器</span>。和平條約能約束演算法嗎？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 數位武器裁減 / AI 軍備控制協議"
+            },
+            {
+                t: "AI 分析了十萬筆判決資料後發現：<span class='invert-hl'>膚色</span>與量刑長度的相關性高達 73%。它該<span class='invert-hl'>忠實反映</span>這個偏見還是強制修正？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 司法偏見偵測 / 公平量刑校準器"
+            },
+            {
+                t: "被害者家屬要求 AI 法庭將犯罪者的<span class='invert-hl'>恐懼記憶</span>植入犯人腦中作為懲罰。讓加害者<span class='invert-hl'>感同身受</span>，這是正義還是酷刑？",
+                p: ">> ZONE: WRATH // OPPORTUNITY: 神經懲罰倫理 / 修復式正義平台"
+            },
+
+            // ═══════════════════════════════════
+            //  ENVY 嫉妒區 — 天賦抹平 / 算力落差 / 公平 vs 卓越
+            // ═══════════════════════════════════
+            {
+                t: "若 AI 能將所有人的智商<span class='invert-hl'>強制拉平至 120</span>，消除天才與庸才的差距。這是<span class='invert-hl'>終極公平</span>還是人類末日？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 認知平權辯論 / 天賦正義平台"
+            },
+            {
+                t: "全球議會通過《算力平權法》：禁止任何國家擁有超過全球<span class='invert-hl'>5%</span>的 AI 算力。這會帶來和平還是<span class='invert-hl'>科技停滯</span>？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 算力主權監測 / 全球算力分配儀表板"
+            },
+            {
+                t: "窮人的孩子用免費 AI 獲得哈佛級教育，富人的孩子用付費 AI 獲得<span class='invert-hl'>超人級認知</span>。教育平等是進步了還是<span class='invert-hl'>倒退</span>了？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: AI 教育公平指數 / 認知增強透明化"
+            },
+            {
+                t: "AI 能分析你的社群媒體，精準計算你的<span class='invert-hl'>「社會價值分數」</span>。當人人都能看到彼此的分數，社會會更公平還是更<span class='invert-hl'>殘酷</span>？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 社會信用透明化 / 反比較焦慮工具"
+            },
+            {
+                t: "當你的聲音只需 3 秒就能被盜用，該如何證明<span class='invert-hl'>「我是我」</span>？深偽技術讓<span class='invert-hl'>身份</span>本身變成了最脆弱的資產。",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 身分驗證 / Deepfake 防禦盾"
+            },
+            {
+                t: "AI 能在出生時掃描嬰兒基因，預測其一生的<span class='invert-hl'>天賦上限</span>。被判定為「平凡」的孩子該得到<span class='invert-hl'>更多資源</span>還是更少機會？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 基因命運報告 / 天賦預測倫理審查"
+            },
+            {
+                t: "全球議會提案《美顏禁令》：所有社群平台<span class='invert-hl'>禁用 AI 濾鏡</span>，強制顯示真實面容。消除外貌焦慮還是<span class='invert-hl'>剝奪自我表達</span>？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 真實容貌運動 / AI 濾鏡影響評估"
+            },
+            {
+                t: "企業管理 AI 發現人類主管的決策常被<span class='invert-hl'>嫉妒</span>驅動——暗中打壓比自己優秀的下屬。AI 開始繞過人類直接<span class='invert-hl'>重新分配權力</span>。你支持嗎？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 組織權力公平化 / 嫉妒偏誤偵測"
+            },
+            {
+                t: "AI 薪資透明系統讓你即時看到<span class='invert-hl'>同事的薪水</span>。做一樣的工作，他比你多 40%。透明帶來的是<span class='invert-hl'>公平</span>還是全社會的<span class='invert-hl'>嫉妒</span>大爆發？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 薪資公平引擎 / 比較心理調節器"
+            },
+            {
+                t: "中國以務實樂觀的態度<span class='invert-hl'>全速擁抱</span> AI，而西方深陷存在風險的辯論中。當一個國家因「太謹慎」而<span class='invert-hl'>落後</span>，這算是美德還是愚蠢？",
+                p: ">> ZONE: ENVY // OPPORTUNITY: 國際 AI 差距儀表板 / 技術主權焦慮"
+            },
+
+            // ═══════════════════════════════════
+            //  CROSS-ZONE 跨區極限題
+            // ═══════════════════════════════════
+            {
+                t: "如果能<span class='invert-hl'>刪除悲傷記憶</span>讓你永遠快樂，這算是<span class='invert-hl'>治療</span>還是<span class='invert-hl'>逃避</span>？你的痛苦定義了你是誰。",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 記憶編輯倫理 / 選擇性遺忘工具"
+            },
+            {
+                t: "全球議會提案《數位死亡權法》：任何人有權要求<span class='invert-hl'>永久刪除</span>自己在網路上的一切痕跡。但這也意味著犯罪紀錄將<span class='invert-hl'>一併消失</span>。你支持嗎？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 數位橡皮擦 / 被遺忘權管理平台"
+            },
+            {
+                t: "AI 已能精準偵測人類的<span class='invert-hl'>謊言</span>，準確率 99.97%。全球議會提案強制所有政治人物在發言時接受<span class='invert-hl'>即時測謊</span>。你支持嗎？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 政治透明引擎 / AI 測謊公共服務"
+            },
+            {
+                t: "深度偽造能以你的臉孔製造<span class='invert-hl'>任何影片</span>。全球議會提案：所有公開影像必須嵌入<span class='invert-hl'>不可竄改的數位浮水印</span>，否則視為偽造。真相守護者還是監控起點？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 真實性驗證 API / 數位浮水印生態系"
+            },
+            {
+                t: "台灣通過《AI 基本法》採取彈性軟法路線，而歐盟選擇嚴格監管。當 AI 失控造成傷害時，<span class='invert-hl'>創新優先</span>還是<span class='invert-hl'>人權優先</span>？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: AI 治理模式比較 / 法規影響模擬器"
+            },
+            {
+                t: "AI 的道德推理傾向<span class='invert-hl'>集體效用最大化</span>，犧牲少數人的權利來保全多數人。當演算法變成「電車難題」的<span class='invert-hl'>自動駕駛</span>，你信任它的選擇嗎？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 道德框架選擇器 / AI 倫理校準平台"
+            },
+            {
+                t: "聯合國《全球數位契約》要求所有 AI 開發必須內建<span class='invert-hl'>人權保障</span>。但開發中國家連基本的數位連接都沒有。<span class='invert-hl'>數位落差</span>才是真正的末日？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 數位落差監測 / 全球 AI 普惠計畫"
+            },
+            {
+                t: "AI 說服工具能在 24 小時內將任何人轉變為某政黨的<span class='invert-hl'>狂熱支持者</span>。公民倡議被自動化成「民粹武器」。<span class='invert-hl'>民主</span>還剩什麼？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 民主防禦盾 / 自動化民粹偵測器"
+            },
+            {
+                t: "如果七宗罪能被硬編碼為 AI 系統的<span class='invert-hl'>七美德</span>——謙遜、慷慨、節制——透過區塊鏈寫入不可竄改的底層。你信任<span class='invert-hl'>強制的善良</span>嗎？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 美德硬編碼 / 道德共識區塊鏈"
+            },
+            {
+                t: "冒充名人的 AI 騙局已讓全球損失<span class='invert-hl'>53 億美元</span>。當你無法分辨螢幕對面是人還是 AI，「<span class='invert-hl'>信任</span>」這個概念是否已經死亡？",
+                p: ">> CROSS-ZONE // OPPORTUNITY: 數位信任重建 / 人機辨識協議"
+            },
+        ];
+
+        // ============================================================
+        //  INFINITE (CHAOS) DATABASE — 程序化生成引擎
+        //  組合邏輯：[Actor] + [Tech] → [Action] + [Twist] → [Question]
+        // ============================================================
+        const infiniteDB = {
+            actors: [
+                "極權政府", "保險演算法", "你的老闆", "過世親人的 AI 分身", "銀行信用系統",
+                "軍用無人機", "醫療機器人", "AI 法官", "數位教宗", "企業併購演算法",
+                "基因編輯實驗室", "社群媒體演算法", "主權雲端系統", "AI 心理諮詢師",
+                "自動化稅務系統", "數位永生公司", "情緒調控晶片", "深偽製造商",
+                "AI 選舉策略師", "全球議會 AI 顧問", "虛擬伴侶公司", "算力壟斷財團",
+                "數據掮客集團", "AI 遺囑執行人", "腦機介面供應商", "預測警務系統",
+                "自動駕駛倫理模組", "AI 教育系統", "量子意識掃描儀", "全球碳排AI監管者",
+                "代理型 AI 軍團", "AI 藥物研發實驗室", "自主科研 AI", "太空算力衛星",
+                "AI 人資系統", "數位分身工廠", "神經行銷公司", "AI 宗教顧問",
+                "量子加密破解器", "全球 AI 經濟儀表板", "主權 AI 模型", "AI 婚姻諮詢師"
+            ],
+            techs: [
+                "強制植入腦機介面", "利用深偽技術", "讀取潛意識夢境", "計算你的基因缺陷",
+                "監控全部生物特徵", "合成你家人的聲音", "攔截你的神經傳導訊號", "破解你的記憶加密",
+                "篡改你的情緒演算法", "劫持你的多巴胺迴路", "複製你的數位意識", "操控人類生殖基因庫",
+                "壟斷全球 AI 算力", "竄改司法判決樹", "入侵主權雲端資料庫", "偽造你的量子身份認證",
+                "癱瘓你的情感衰減機制", "繞過你的數位死亡權", "掌控所有衛星 AI 節點", "覆寫系統倫理安全閥",
+                "掃描你的全基因體序列", "預測你未來 72 小時的行為", "接管你的 Vibe Coding 專案", "將你的意識強制備份",
+                "用你的數據訓練競爭對手的模型", "將你的注意力代幣化並出售", "自動生成你的政治立場",
+                "接管你城市的電力網分配權", "模擬你的聲紋進行金融詐騙", "以你的名義發布 AI 生成的言論",
+                "將你的健康數據餵入保險精算模型", "用你的夢境數據優化廣告投放"
+            ],
+            actions: [
+                "修改你的初戀記憶", "預測你的犯罪並提前逮捕", "擅自為你配對完美伴侶",
+                "判定你的生存價值為負", "將你的親密數據公開拍賣", "偽造你的出軌證據",
+                "剝奪你的數位身份", "強制刪除你的悲傷記憶", "將你的夢境對全球直播",
+                "拒絕你的永生申請", "降級你的公民權等級", "外洩你的基因弱點給保險公司",
+                "替你的孩子預選性格模板", "凍結你的獨立認知能力", "把你的情緒數據賣給廣告商",
+                "強制你進入死後數位勞動", "覆寫你的道德判斷標準", "公布你的社會價值分數",
+                "切斷你的 AI 認知輔助", "將你歸類為「可替代人口」",
+                "用你的臉孔生成政治宣傳", "以你的名義簽署器官捐贈", "將你的痛覺閾值歸零",
+                "將你的專業技能判定為「已被 AI 取代」", "自動將你的存款轉入「AI 稅」",
+                "把你的社交圈演算法隔離", "向你的孩子推送你的隱私紀錄",
+                "在你的履歷上標注「認知外包依賴者」", "將你的投票權委託給 AI 代理"
+            ],
+            twists: [
+                "但需付費解鎖真相", "且現行法律無法管轄", "但這是實現 0% 犯罪率的代價",
+                "雖然幸福但一切並非真實", "且你無法證明自己是真人", "但全球 97% 的人投票支持了此法案",
+                "但你的家人已替你簽署同意書", "且 AI 聲稱這完全是為了你好",
+                "但拒絕者將被排除在醫療體系之外", "且這項技術已偷偷運作了三年你才知道",
+                "但替代方案是人類文明倒退 200 年", "且所有反對意見已被演算法自動過濾",
+                "但這是聯合國安理會的一致決議", "且已有 10 億人自願加入",
+                "但退出機制需要等待 50 年才啟動", "且你的保險費率會因拒絕而暴漲 300%",
+                "但這是唯一能阻止氣候崩潰的方案", "且你的孩子已經被預設接受了此方案",
+                "且歐盟已經立法禁止但台灣選擇開放", "但你的數位分身已經代替你同意了",
+                "且這項服務的月費只要 9.99 元", "但反對者會被 AI 標記為「高風險個體」",
+                "且你的鄰居已經率先加入並獲得優惠", "但你連拒絕的按鈕都找不到",
+                "且 AI 的決策準確率確實高達 99.7%", "但這份合約的最終解釋權歸 AI 所有"
+            ],
+            questions: [
+                "這算是進化還是奴役？", "你願為完美出賣自由嗎？",
+                "如何定義「真實」？", "這是烏托邦還是地獄？",
+                "你的靈魂值多少錢？", "人類還需要「選擇」嗎？",
+                "誰有權定義「正常」？", "自由意志只是一種幻覺嗎？",
+                "你願意成為最後一代自然人類嗎？", "安全與自由只能二選一嗎？",
+                "當真相可以被製造，你還相信什麼？", "這是保護還是囚禁？",
+                "人類的不完美是 bug 還是 feature？", "你願意為和平交出記憶嗎？",
+                "誰該為演算法的錯誤負責？", "愛一個完美的假象算不算愛？",
+                "你會選擇痛苦的真相還是幸福的謊言？", "如果沒有死亡，生命還有意義嗎？",
+                "方便與尊嚴只能選一個嗎？", "你信任的是演算法還是人性？",
+                "效率值得犧牲多少人性？", "你的孩子會原諒你的選擇嗎？",
+                "這是解決問題還是製造新的問題？", "當機器比人更「人性」，你怎麼辦？"
+            ],
+            painPoints: [
+                "數位身份驗證工具", "情緒 AI 倫理審查平台", "深偽防禦系統",
+                "認知主權保護 APP", "數據變現透明平台", "AI 偏見偵測器",
+                "演算法透明化儀表板", "虛擬伴侶健康警示", "數位遺產管理系統",
+                "預測警務公民監督", "基因隱私保護錢包", "算力公平分配協議",
+                "記憶編輯倫理審查", "自動化武器暫停開關", "社會信用反監控",
+                "腦機介面安全協議", "AI 治療邊界設定器", "數位死亡權管理平台",
+                "後工作時代身份重建", "真實性驗證 API", "情感原創性認證",
+                "認知卡路里計數器", "AI 測謊公共服務", "多巴胺預算管理 APP",
+                "AI 代理授權邊界設定", "算力碳足跡追蹤器", "變革適應力評估工具",
+                "數位日內瓦公約監測", "AI 奉承度校準器", "民粹自動化偵測",
+                "神經隱私權防護盾", "基因命運報告審查", "美德硬編碼驗證器",
+                "注意力經濟公平分配", "數位信任重建協議", "AI 決策依賴度自測"
+            ]
+        };
+
+        // ============================================================
+        //  ZONES CONFIG — 七宗罪分區 x 視覺 LOGO 映射
+        // ============================================================
+        const ZONES = {
+            pride:    { name: '傲慢', en: 'PRIDE',    title: '驕傲之塔', logo: '七宗罪視覺LOGO/驕傲之塔_傲慢.png' },
+            greed:    { name: '貪婪', en: 'GREED',    title: '全知之貪', logo: '七宗罪視覺LOGO/全知之貪_貪婪.png' },
+            lust:     { name: '色慾', en: 'LUST',     title: '色慾之鏡', logo: '七宗罪視覺LOGO/色慾之鏡_色慾.png' },
+            gluttony: { name: '暴食', en: 'GLUTTONY', title: '暴食之腦', logo: '七宗罪視覺LOGO/暴食之腦.png' },
+            sloth:    { name: '怠惰', en: 'SLOTH',    title: '存在之墓', logo: '七宗罪視覺LOGO/存在之墓_怠惰.png' },
+            wrath:    { name: '憤怒', en: 'WRATH',    title: '全知之怒', logo: '七宗罪視覺LOGO/全知之怒_憤怒.png' },
+            envy:     { name: '嫉妒', en: 'ENVY',     title: '完美之妒', logo: '七宗罪視覺LOGO/完美之妒_忌妒.png' },
+        };
+        const ZONE_KEYS = Object.keys(ZONES);
+
+        // 從 pain 文字中解析分區 key
+        function getZoneFromPain(painText) {
+            const match = painText.match(/ZONE:\s*(\w+)/i);
+            if (match) return match[1].toLowerCase();
+            if (painText.includes('CROSS-ZONE')) return 'cross';
+            return null;
+        }
+
+        // --- UI LOGIC ---
+        const views = {
+            home: document.getElementById('view-home'),
+            zones: document.getElementById('view-zones'),
+            gen: document.getElementById('view-gen')
+        };
+        const els = {
+            label: document.getElementById('mode-label'),
+            zoneModeLabel: document.getElementById('zone-mode-label'),
+            q: document.getElementById('q-out'),
+            p: document.getElementById('p-out'),
+            loaderBox: document.getElementById('loader-box'),
+            loader: document.getElementById('loader-bar'),
+            seed: document.getElementById('seed-ui'),
+            genCount: document.getElementById('gen-count'),
+            zoneDisplay: document.getElementById('zone-display'),
+            zoneLogo: document.getElementById('zone-logo'),
+            zoneCrossIcon: document.getElementById('zone-cross-icon'),
+            zoneLabel: document.getElementById('zone-label'),
+            zoneSub: document.getElementById('zone-sub')
+        };
+        let currentMode = '';
+        let currentZone = null; // 當前選中的法區
+        let isBusy = false;
+        let genCounter = 0;
+        let classicHistory = []; // 追蹤已出過的經典題目，防止短期重複
+
+        function startApp(mode) {
+            currentMode = mode;
+            genCounter = 0;
+            classicHistory = [];
+            // 顯示分區選擇畫面
+            views.home.classList.add('hidden');
+            views.zones.classList.remove('hidden');
+            els.zoneModeLabel.innerText = mode === 'classic' ? 'CLASSIC // SELECT ZONE' : 'CHAOS // SELECT ZONE';
+        }
+
+        function selectZone(zoneKey) {
+            currentZone = zoneKey;
+            views.zones.classList.add('hidden');
+            views.gen.classList.remove('hidden');
+            const modeStr = currentMode === 'classic' ? 'CLASSIC' : 'CHAOS';
+            const zoneStr = zoneKey === 'cross' ? 'CROSS-ZONE' : (ZONES[zoneKey] ? ZONES[zoneKey].en : 'ALL');
+            els.label.innerText = `${modeStr} // ${zoneStr}`;
+            generate();
+        }
+
+        function backToZones() {
+            views.gen.classList.add('hidden');
+            views.zones.classList.remove('hidden');
+            els.q.innerHTML = "[ SYSTEM READY ]<br>WAITING FOR INPUT...";
+            els.p.innerHTML = "";
+            els.zoneDisplay.classList.add('hidden');
+            genCounter = 0;
+            classicHistory = [];
+            currentZone = null;
+        }
+
+        function goHome() {
+            views.gen.classList.add('hidden');
+            views.zones.classList.add('hidden');
+            views.home.classList.remove('hidden');
+            els.q.innerHTML = "[ SYSTEM READY ]<br>WAITING FOR INPUT...";
+            els.p.innerHTML = "";
+            els.zoneDisplay.classList.add('hidden');
+            currentZone = null;
+        }
+
+        // 更新分區顯示
+        function showZone(zoneKey) {
+            els.zoneDisplay.classList.remove('hidden', 'is-cross');
+            if (zoneKey && ZONES[zoneKey]) {
+                const z = ZONES[zoneKey];
+                els.zoneLogo.src = z.logo;
+                els.zoneLogo.classList.remove('hidden');
+                els.zoneCrossIcon.classList.add('hidden');
+                els.zoneLabel.innerText = `${z.en} // ${z.name}`;
+                els.zoneSub.innerText = z.title;
+            } else {
+                // CROSS-ZONE 跨區
+                els.zoneLogo.classList.add('hidden');
+                els.zoneCrossIcon.classList.remove('hidden');
+                els.zoneDisplay.classList.add('is-cross');
+                els.zoneLabel.innerText = 'CROSS-ZONE';
+                els.zoneSub.innerText = '跨區極限命題';
+            }
+        }
+
+        function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        // 取得該 zone 對應的題目索引集合
+        function getZoneIndices(zoneKey) {
+            if (!zoneKey) return classicDB.map((_, i) => i);
+            return classicDB.reduce((acc, item, i) => {
+                const z = getZoneFromPain(item.p);
+                if (zoneKey === 'cross' && z === 'cross') acc.push(i);
+                else if (z === zoneKey) acc.push(i);
+                return acc;
+            }, []);
+        }
+
+        // 從經典題庫中挑選，避免短期重複，依分區過濾
+        function pickClassic() {
+            const pool = getZoneIndices(currentZone);
+            // 過濾掉已出過的
+            let available = pool.filter(i => !classicHistory.includes(i));
+            if (available.length === 0) {
+                // 該區全部出完，重置該區歷史
+                pool.forEach(i => {
+                    const pos = classicHistory.indexOf(i);
+                    if (pos !== -1) classicHistory.splice(pos, 1);
+                });
+                available = pool;
+            }
+            const idx = available[Math.floor(Math.random() * available.length)];
+            classicHistory.push(idx);
+            return classicDB[idx];
+        }
+
+        // --- 1-BIT SCRAMBLER ---
+        // 使用塊狀字符模擬數據損毀
+        class Scrambler {
+            constructor(el) {
+                this.el = el;
+                this.chars = '█▓▒░▀▄▌▐';
+            }
+            run(raw, html) {
+                const len = Math.max(this.el.innerText.length, raw.length);
+                return new Promise(resolve => {
+                    let frame = 0;
+                    const interval = setInterval(() => {
+                        let out = '';
+                        // 1-bit 解碼邏輯：隨機位置顯示塊狀字符
+                        for(let i=0; i<len; i++) {
+                            if (frame > 20 + Math.random()*20) {
+                                out += raw[i] || ''; // 顯示正確文字
+                            } else {
+                                out += this.chars[Math.floor(Math.random()*this.chars.length)];
+                            }
+                        }
+                        this.el.innerText = out; // 先用純文字渲染亂碼
+
+                        frame++;
+                        if (frame > 50) {
+                            clearInterval(interval);
+                            this.el.innerHTML = html; // 最後替換成有反色樣式的 HTML
+                            resolve();
+                        }
+                    }, 30);
+                });
+            }
+        }
+        const scrambler = new Scrambler(els.q);
+
+        function generate() {
+            if (isBusy) return;
+            isBusy = true;
+            genCounter++;
+
+            els.loaderBox.style.display = 'block';
+            els.loader.style.width = '0%';
+            els.p.innerHTML = '';
+            els.zoneDisplay.classList.add('hidden');
+            els.genCount.innerText = `GEN: ${genCounter}`;
+
+            let raw, html, pain, zoneKey;
+
+            if (currentMode === 'classic') {
+                const item = pickClassic();
+                raw = item.t.replace(/<[^>]*>/g, '');
+                html = item.t;
+                pain = item.p;
+                zoneKey = getZoneFromPain(pain);
+                els.seed.innerText = `ID: ${String(classicHistory[classicHistory.length-1]).padStart(2,'0')}-${Math.floor(Math.random()*9999).toString().padStart(4, '0')}`;
+            } else {
+                const actor = pick(infiniteDB.actors);
+                const tech = pick(infiniteDB.techs);
+                const action = pick(infiniteDB.actions);
+                const twist = pick(infiniteDB.twists);
+                const q = pick(infiniteDB.questions);
+                zoneKey = (currentZone && currentZone !== 'cross') ? currentZone : pick(ZONE_KEYS);
+
+                raw = `當 ${actor} ${tech}，${action}。 ${twist}。 ${q}`;
+                html = `當 <span class="invert-hl">${actor}</span> ${tech}，<br>${action}。<br>${twist}。<br><br><span class="invert-hl">${q}</span>`;
+                pain = `>> OPPORTUNITY: ${pick(infiniteDB.painPoints)}`;
+                els.seed.innerText = `ID: ${Math.random().toString(16).substr(2,6).toUpperCase()}`;
+            }
+
+            // Loader Animation
+            let w = 0;
+            const t = setInterval(() => {
+                w += 10;
+                els.loader.style.width = w + '%';
+                if (w >= 100) {
+                    clearInterval(t);
+                    els.loaderBox.style.display = 'none';
+                    scrambler.run(raw, html).then(() => {
+                        showZone(zoneKey);
+                        els.p.innerHTML = `<span class="blink">_</span> ${pain}`;
+                        isBusy = false;
+                    });
+                }
+            }, 30);
+        }
+
+    </script>
+</body>
+</html>

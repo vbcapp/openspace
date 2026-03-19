@@ -1,0 +1,25 @@
+{
+  "name": "AI末日議會 — Doomsday Parliament",
+  "short_name": "末日議會",
+  "description": "AI末日議會互動 WebApp — 3/28 活動專用",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#ff003c",
+  "background_color": "#020002",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待機主畫面</title>
+    <style>
+        @font-face {
+            font-family: 'Hatten';
+            src: url('Fonts/HATTEN.TTF') format('truetype');
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 最底層隧道背景 */
+        .tunnel-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background: url('4K數位隧道背景.webp') center center / cover no-repeat;
+        }
+
+        .grid {
+            position: fixed;
+            inset: 0;
+        }
+
+        .card {
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.4s ease;
+            will-change: transform;
+        }
+
+        .card-upright { z-index: 2; }
+        .card-inverted { z-index: 1; }
+
+        .card .border {
+            position: absolute;
+            inset: 0;
+            background: #e60012;
+            transition: background 0.3s ease;
+        }
+
+        .card .image {
+            position: absolute;
+            inset: 0;
+        }
+
+        .card .image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 20%;
+            filter: brightness(0.55) saturate(1.3);
+            transition: filter 0.3s ease;
+        }
+
+        .card .number {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Hatten', sans-serif;
+            color: #fff;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.95);
+            letter-spacing: 1px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* 正立卡片 */
+        .card-upright .border {
+            clip-path: polygon(37% 0%, 63% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+        }
+        .card-upright .image {
+            clip-path: polygon(39% 2.8%, 61% 2.8%, 97% 86%, 90% 97%, 10% 97%, 3% 86%);
+        }
+
+        /* 倒立卡片 */
+        .card-inverted .border {
+            clip-path: polygon(8% 0%, 92% 0%, 100% 14%, 63% 100%, 37% 100%, 0% 14%);
+        }
+        .card-inverted .image {
+            clip-path: polygon(10% 3%, 90% 3%, 97% 14%, 61% 97.2%, 39% 97.2%, 3% 14%);
+        }
+
+        /* ========== Hover 效果 ========== */
+        .card:hover .border {
+            background: #ff2040;
+        }
+        .card:hover .image img {
+            filter: brightness(0.75) saturate(1.5);
+        }
+
+        /* ========== 選取放大效果 ========== */
+        .card.selected {
+            z-index: 20 !important;
+        }
+        .card.selected .border {
+            background: #ff3050;
+        }
+        .card.selected .image img {
+            filter: brightness(0.9) saturate(1.4);
+        }
+
+        /* ========== 中央眼睛影片 ========== */
+        .eye-container {
+            position: fixed;
+            z-index: 10;
+            filter: drop-shadow(0 0 40px rgba(230, 0, 18, 0.5))
+                    drop-shadow(0 0 80px rgba(230, 0, 18, 0.2));
+        }
+
+        .eye-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            /* 頂部窄邊縮短，遮擋白色背景 */
+            clip-path: polygon(44% 0%, 56% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tunnel-bg"></div>
+    <div class="grid" id="grid"></div>
+
+    <div class="eye-container" id="eyeContainer">
+        <video autoplay loop muted playsinline>
+            <source src="眼睛LOGO眨眼.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <script>
+        (() => {
+            const grid = document.getElementById('grid');
+            const eyeContainer = document.getElementById('eyeContainer');
+
+            /* ---- 參數（與排列測試CSS.html 一致） ---- */
+            const ROWS    = 7;
+            const COLS    = 19;
+            const GAP     = 0.35;
+            const ROW_GAP = 0.2;
+            const MARGIN  = 2;
+
+            const vhVw = window.innerHeight / window.innerWidth * 100;
+
+            const W_h = (100 - 2 * MARGIN - (COLS - 1) * GAP) / (1 + (COLS - 1) * 0.63);
+            const W_v = (vhVw - 2 * MARGIN - (ROWS - 1) * ROW_GAP) / (ROWS * 1.14 * 605 / 640);
+            const W    = Math.min(W_h, W_v);
+            const H    = W * 605 / 640;
+            const SX   = W * 0.63 + GAP;
+            const SY   = 1.14 * H + ROW_GAP;
+            const FONT = W * 0.11;
+
+            const totalW = (COLS - 1) * SX + W;
+            const totalH = (ROWS - 1) * SY + 1.14 * H;
+            const startX = (100 - totalW) / 2;
+            const startYUp = (vhVw - totalH) / 2 + 0.14 * H;
+
+            /* ---- 要移除的卡片（為眼睛留空） ---- */
+            /* 第3排第10張:   r=2, i=9
+               第4排第9-11張: r=3, i=8,9,10
+               第5排第8-12張: r=4, i=7,8,9,10,11 */
+            const removed = new Set([
+                '2,9',
+                '3,8', '3,9', '3,10',
+                '4,7', '4,8', '4,9', '4,10', '4,11'
+            ]);
+
+            /* ---- 眼睛影片定位 ---- */
+            const EYE_SHRINK = 0.85;          // 縮小比例，留出間隔
+            const eyeTopVw  = startYUp + 2 * SY;
+            const eyeBotVw  = startYUp + 4 * SY + H;
+            const eyeH_full = eyeBotVw - eyeTopVw;
+            const eyeH_vw   = eyeH_full * EYE_SHRINK;
+            const eyeW_vw   = eyeH_vw * 640 / 605;
+            const eyeCenterX = startX + 9 * SX + W / 2;
+
+            const eyeCenterY = (eyeTopVw + eyeBotVw) / 2 + 0.15 * H;
+            eyeContainer.style.cssText =
+                `left:${eyeCenterX - eyeW_vw / 2}vw;` +
+                `top:${eyeCenterY - eyeH_vw / 2}vw;` +
+                `width:${eyeW_vw}vw;` +
+                `height:${eyeH_vw}vw;`;
+
+            /* ---- 排列規則（與排列測試CSS.html 一致） ---- */
+            /*  第 1 排 (r=0)：倒立開始  I U I U I …
+                第 2 排 (r=1)：正立開始  U I U I U …
+                以此類推（奇偶交替）               */
+
+            const cardData = new Map();
+            let num = 1;
+
+            for (let r = 0; r < ROWS; r++) {
+                const yUp  = startYUp + r * SY;
+                const yInv = yUp - 0.14 * H;
+
+                for (let i = 0; i < COLS; i++) {
+                    if (removed.has(`${r},${i}`)) continue;
+
+                    const inv = ((r + i) % 2 === 0);
+                    const x   = startX + i * SX;
+                    const y   = inv ? yInv : yUp;
+
+                    const card = document.createElement('div');
+                    card.className = `card ${inv ? 'card-inverted' : 'card-upright'}`;
+                    card.style.cssText = `left:${x}vw;top:${y}vw;width:${W}vw;height:${H}vw;`;
+
+                    const s = String(num).padStart(3, '0');
+                    card.innerHTML =
+                        '<div class="border"></div>' +
+                        '<div class="image">' +
+                            `<img src="人物/${s}.png" alt="${s}" onerror="if(this.src.endsWith('.png')){this.src=this.src.replace('.png','.jpg')}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else{this.parentElement.style.display='none'}">` +
+                        '</div>' +
+                        `<div class="number" style="font-size:${FONT}vw">${s}</div>`;
+                    num++;
+
+                    cardData.set(card, { origX: x, origY: y, inv: inv, selected: false });
+
+                    card.addEventListener('click', () => {
+                        const d = cardData.get(card);
+                        d.selected = !d.selected;
+                        card.classList.toggle('selected', d.selected);
+                        layoutCards();
+                    });
+
+                    grid.appendChild(card);
+                }
+            }
+
+            /* ---- 選取卡片：用 transform 放大置中（GPU 加速） ---- */
+            function layoutCards() {
+                const selected = [];
+
+                for (const [c, d] of cardData) {
+                    if (d.selected) {
+                        selected.push({ card: c, data: d });
+                    } else {
+                        c.style.transform = '';
+                    }
+                }
+
+                if (selected.length === 0) {
+                    grid.style.zIndex = '';
+                    return;
+                }
+
+                // 提升 grid 層級，讓選取卡片顯示在眼睛動畫上方
+                grid.style.zIndex = '15';
+
+                // 計算放大尺寸（依選取數量自適應）
+                const SEL_GAP = 1.5;
+                const bigW = Math.min(15, (90 - (selected.length - 1) * SEL_GAP) / selected.length);
+                const scale = bigW / W;
+                const bigH = bigW * 605 / 640;
+                const totalSelW = selected.length * bigW + (selected.length - 1) * SEL_GAP;
+                const selStartX = (100 - totalSelW) / 2;
+                const centerY = vhVw / 2 - bigH / 2;
+
+                selected.forEach(({ card: c, data: d }, idx) => {
+                    const targetX = selStartX + idx * (bigW + SEL_GAP);
+                    const targetY = centerY;
+                    const dx = targetX - d.origX - W * (1 - scale) / 2;
+                    const dy = targetY - d.origY - H * (1 - scale) / 2;
+                    c.style.transform = `translate(${dx}vw, ${dy}vw) scale(${scale})`;
+                });
+            }
+        })();
+    </script>
+
+</body>
+</html>

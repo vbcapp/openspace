@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入主畫面</title>
+    <style>
+        @font-face {
+            font-family: 'Hatten';
+            src: url('Fonts/HATTEN.TTF') format('truetype');
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* ========== 背景卡片容器 ========== */
+        .card-grid {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .card-cell {
+            position: absolute;
+        }
+
+        /* 正立卡片疊在倒立卡片上方，避免底部被遮擋 */
+        .card-upright { z-index: 2; }
+        .card-inverted { z-index: 1; }
+
+        .card-cell .card-border {
+            position: absolute;
+            inset: 0;
+            background: #e60012;
+        }
+
+        .card-cell .card-image {
+            position: absolute;
+            inset: 0;
+        }
+
+        .card-cell .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 20%;
+            filter: brightness(0.55) saturate(1.3);
+        }
+
+        .card-cell .card-number {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Hatten', sans-serif;
+            color: #fff;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.95);
+            letter-spacing: 1px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* 正立卡片 */
+        .card-upright .card-border {
+            clip-path: polygon(37% 0%, 63% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+        }
+        .card-upright .card-image {
+            clip-path: polygon(39% 2.8%, 61% 2.8%, 97% 86%, 90% 97%, 10% 97%, 3% 86%);
+        }
+
+        /* 倒立卡片 */
+        .card-inverted .card-border {
+            clip-path: polygon(8% 0%, 92% 0%, 100% 14%, 63% 100%, 37% 100%, 0% 14%);
+        }
+        .card-inverted .card-image {
+            clip-path: polygon(10% 3%, 90% 3%, 97% 14%, 61% 97.2%, 39% 97.2%, 3% 14%);
+        }
+
+        /* ========== 中央眼睛影片 ========== */
+        .eye-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 24vmin;
+            z-index: 10;
+            filter: drop-shadow(0 0 40px rgba(230, 0, 18, 0.5))
+                    drop-shadow(0 0 80px rgba(230, 0, 18, 0.2));
+        }
+
+        .eye-container video {
+            width: 100%;
+            display: block;
+            /* 頂部窄邊縮短，遮擋白色背景 */
+            clip-path: polygon(44% 0%, 56% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card-grid" id="cardGrid"></div>
+    <div class="eye-container">
+        <video autoplay loop muted playsinline>
+            <source src="眼睛LOGO眨眼.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <script>
+        (() => {
+            const grid = document.getElementById('cardGrid');
+
+            /* ---------- 卡片尺寸（vw 單位） ---------- */
+            const W = 9;
+            const H = W * 605 / 640;
+            const SX = W * 0.63;                // 水平鑲嵌步距
+            const SY = H * 0.86;                // 垂直鑲嵌步距
+            const FONT = W * 0.11;
+
+            /* ---------- 畫面尺寸（轉成 vw） ---------- */
+            const vhVw = window.innerHeight / window.innerWidth * 100;
+            const centerX = 50;
+            const centerY = vhVw / 2;
+            const eyeRadius = 9;                // 眼睛預留區域半徑（僅剛好包住六角形）
+
+            /* ---------- 產生所有鑲嵌格位 ---------- */
+            const positions = [];
+            const maxCols = Math.ceil(105 / SX) + 2;
+            const maxRows = Math.ceil((vhVw + H) / SY) + 2;
+
+            for (let r = -1; r < maxRows; r++) {
+                const yBase = r * SY;
+                const odd = ((r % 2) + 2) % 2 === 1;
+                const xOff = odd ? SX : 0;
+
+                for (let c = -1; c < maxCols; c++) {
+                    const inv = ((c % 2) + 2) % 2 === 1;
+                    const x = xOff + c * SX;
+                    const y = yBase + (inv ? -H * 0.14 : 0);
+
+                    const cx = x + W / 2;
+                    const cy = y + H / 2;
+
+                    if (cx < -2 || cx > 102 || cy < -2 || cy > vhVw + 2) continue;
+
+                    positions.push({ x, y, inv, row: r });
+                }
+            }
+
+            /* ---------- 排序：由上而下、由左而右 ---------- */
+            positions.sort((a, b) => {
+                if (a.row !== b.row) return a.row - b.row;
+                return a.x - b.x;
+            });
+
+            /* ---------- 放置卡片 ---------- */
+            let num = 1;
+
+            for (const pos of positions) {
+                const cx = pos.x + W / 2;
+                const cy = pos.y + H / 2;
+                const dx = cx - centerX;
+                const dy = cy - centerY;
+                const inEyeZone = Math.sqrt(dx * dx + dy * dy) < eyeRadius;
+
+                if (inEyeZone) continue;
+
+                const cell = document.createElement('div');
+                cell.className = `card-cell ${pos.inv ? 'card-inverted' : 'card-upright'}`;
+                cell.style.cssText = `left:${pos.x}vw;top:${pos.y}vw;width:${W}vw;height:${H}vw;`;
+
+                if (num <= 100) {
+                    const s = String(num).padStart(3, '0');
+                    cell.innerHTML =
+                        '<div class="card-border"></div>' +
+                        '<div class="card-image">' +
+                            `<img src="人物/${s}.png" alt="${s}" onerror="this.parentElement.style.display='none'">` +
+                        '</div>' +
+                        `<div class="card-number" style="font-size:${FONT}vw">${s}</div>`;
+                    num++;
+                } else {
+                    cell.innerHTML = '<div class="card-border"></div>';
+                }
+
+                grid.appendChild(cell);
+            }
+        })();
+    </script>
+
+</body>
+</html>

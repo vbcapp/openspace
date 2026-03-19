@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body style="background:#333;color:#fff;font-family:monospace;padding:40px;">
+  <h2>PWA Icon Generator</h2>
+  <p>Right-click each image below and "Save Image As" to save the PNG files.</p>
+  <canvas id="c192" width="192" height="192"></canvas>
+  <canvas id="c512" width="512" height="512"></canvas>
+  <script>
+    function drawIcon(canvas) {
+      const s = canvas.width;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#020002';
+      ctx.fillRect(0, 0, s, s);
+
+      // Grid
+      ctx.strokeStyle = 'rgba(255,0,60,0.1)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, s * i / 4); ctx.lineTo(s, s * i / 4);
+        ctx.moveTo(s * i / 4, 0); ctx.lineTo(s * i / 4, s);
+        ctx.stroke();
+      }
+
+      const cx = s / 2;
+
+      // Outer triangle
+      ctx.strokeStyle = '#ff003c';
+      ctx.lineWidth = s * 0.016;
+      ctx.beginPath();
+      ctx.moveTo(cx, s * 0.156);
+      ctx.lineTo(s * 0.82, s * 0.78);
+      ctx.lineTo(s * 0.18, s * 0.78);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Inner triangle
+      ctx.strokeStyle = 'rgba(255,0,60,0.3)';
+      ctx.lineWidth = s * 0.008;
+      ctx.beginPath();
+      ctx.moveTo(cx, s * 0.273);
+      ctx.lineTo(s * 0.742, s * 0.723);
+      ctx.lineTo(s * 0.258, s * 0.723);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Eye circle
+      ctx.strokeStyle = '#00f3ff';
+      ctx.lineWidth = s * 0.008;
+      ctx.beginPath();
+      ctx.arc(cx, s * 0.547, s * 0.098, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Eye pupil
+      ctx.fillStyle = '#ff003c';
+      ctx.beginPath();
+      ctx.arc(cx, s * 0.547, s * 0.039, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#020002';
+      ctx.beginPath();
+      ctx.arc(cx, s * 0.547, s * 0.016, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Text "AI"
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${s * 0.094}px Arial Black, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.letterSpacing = `${s * 0.016}px`;
+      ctx.fillText('AI', cx, s * 0.898);
+    }
+
+    drawIcon(document.getElementById('c192'));
+    drawIcon(document.getElementById('c512'));
+
+    // Auto-download
+    ['c192', 'c512'].forEach(id => {
+      const canvas = document.getElementById(id);
+      const link = document.createElement('a');
+      link.download = `icon-${canvas.width}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  </script>
+</body>
+</html>
