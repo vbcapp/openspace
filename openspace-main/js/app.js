@@ -41,36 +41,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   const hash = window.location.hash || '';
   const isPublicRoute = hash.match(/^#\/player\/.+/);
 
-  // Auth guard：暫時關閉，開發用
+  // Auth guard：未登入且非公開路由 → 跳轉登入頁
   const session = await Auth.getSession();
-  // if (!session && !isPublicRoute) {
-  //   window.location.href = 'login.html';
-  //   return;
-  // }
+  if (!session && !isPublicRoute) {
+    window.location.href = 'login.html';
+    return;
+  }
 
-  // Nav bar click handling
-  document.querySelectorAll('.nav-bar__item').forEach(item => {
-    item.addEventListener('click', () => {
-      Router.navigate(item.dataset.route);
+  // Nav bar click handling（已登入才需要）
+  if (session) {
+    document.querySelectorAll('.nav-bar__item').forEach(item => {
+      item.addEventListener('click', () => {
+        Router.navigate(item.dataset.route);
+      });
     });
-  });
+  }
 
-  // Register pages（暫時移除登入限制）
-  Router.register('profile', renderProfilePage);
-  Router.register('matrix', renderMatrixPage);
-  Router.register('vote', renderVotePage);
-  Router.register('vote/result', renderVoteResultPage);
-  Router.register('zones', renderZonesPage);
-  Router.register('zones/:id', renderQuestionGenPage);
-  Router.register('zones/:id/locked', renderLockedQRPage);
-  Router.register('answer/:questionId', renderAnswerPage);
-  Router.register('admin/members', renderAdminMembersPage);
+  // Register pages（已登入才載入完整路由）
+  if (session) {
+    Router.register('profile', renderProfilePage);
+    Router.register('matrix', renderMatrixPage);
+    Router.register('vote', renderVotePage);
+    Router.register('vote/result', renderVoteResultPage);
+    Router.register('zones', renderZonesPage);
+    Router.register('zones/:id', renderQuestionGenPage);
+    Router.register('zones/:id/locked', renderLockedQRPage);
+    Router.register('answer/:questionId', renderAnswerPage);
+    Router.register('admin/members', renderAdminMembersPage);
+  }
 
   // 玩家名片（公開路由，不需登入）
   Router.register('player/:number', renderPlayerCardPage);
 
-  // 設定登入狀態供 Router 判斷是否顯示 nav bar（暫時強制為 true）
-  Router.isAuthenticated = true;
+  // 設定登入狀態供 Router 判斷是否顯示 nav bar
+  Router.isAuthenticated = !!session;
 
   // Start router
   Router.init();
