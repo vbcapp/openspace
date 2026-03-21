@@ -74,7 +74,7 @@ async function _initZonesPage() {
       console.warn('No auth session — using mock zones data for preview');
       zones = _MOCK_ZONES;
     }
-    _zonesDelegateStatus = profile?.delegate_status || 'parliament';
+    _zonesDelegateStatus = profile?.delegate_status || 'alternate';
     _renderZonesGrid(content, zones);
     try { _subscribeZoneLocks(); } catch(e) {}
   } catch (err) {
