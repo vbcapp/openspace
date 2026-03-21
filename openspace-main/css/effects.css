@@ -271,6 +271,289 @@
   100% { top: calc(100% + 14px); opacity: 0; transform: translateX(0); }
 }
 
+/* ================================================================
+   1-BIT DOOMSDAY ENGINE 特效（移植自出題機器人）
+   ================================================================ */
+
+/* ── 反色高亮文字（1-BIT） ── */
+.invert-hl {
+  background-color: var(--color-blood-red);
+  color: #000000;
+  padding: 1px 5px;
+  margin: 0 2px;
+  display: inline;
+  line-height: 1.8;
+}
+
+/* ── 網點背景 (Dither Grid) — 1-BIT 風格 ── */
+.dither-bg {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image:
+    linear-gradient(var(--color-blood-red) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blood-red) 1px, transparent 1px);
+  background-size: 4px 4px;
+  background-position: center;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── CRT 掃描線動畫（1-BIT 版） ── */
+.scan-line-anim {
+  position: relative;
+}
+.scan-line-anim::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 2px;
+  background: var(--color-blood-red);
+  opacity: 0.5;
+  animation: scan-1bit 4s linear infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@keyframes scan-1bit {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+/* ── 硬核 Glitch Skew ── */
+.fx-glitch-skew {
+  animation: glitch-skew-1bit 3s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-skew-1bit {
+  0%   { transform: skew(0deg); }
+  20%  { transform: skew(-8deg); }
+  22%  { transform: skew(8deg); }
+  24%  { transform: skew(0deg); }
+  100% { transform: skew(0deg); }
+}
+
+/* ── 1-BIT Blink ── */
+.blink, .fx-1bit-blink {
+  animation: blink-1bit 1s step-end infinite;
+}
+
+@keyframes blink-1bit {
+  50% { opacity: 0; }
+}
+
+/* ── 1-BIT Loader Bar ── */
+.loader-box {
+  width: 100%;
+  height: 16px;
+  border: 2px solid var(--color-blood-red);
+  padding: 2px;
+  margin-bottom: 12px;
+  display: none;
+  flex-shrink: 0;
+}
+.loader-bar {
+  height: 100%;
+  background: var(--color-blood-red);
+  width: 0%;
+}
+
+/* ── 1-BIT Output Text (question display) ── */
+.output-text {
+  font-family: var(--font-terminal);
+  font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+  line-height: 1.6;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-blood-red);
+  border-bottom: 2px dashed var(--color-blood-red);
+  margin-bottom: 16px;
+  padding: 1rem 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  flex-shrink: 0;
+}
+
+/* ── 1-BIT Action Button ── */
+.action-btn {
+  width: 100%;
+  padding: 14px;
+  font-family: var(--font-terminal);
+  font-size: 1.3rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  background: #000;
+  color: var(--color-blood-red);
+  border: 4px solid var(--color-blood-red);
+  cursor: pointer;
+  margin-top: 12px;
+  transition: 0s;
+  flex-shrink: 0;
+}
+.action-btn:hover {
+  background: var(--color-blood-red);
+  color: #000;
+}
+.action-btn:active {
+  transform: translateY(4px);
+  box-shadow: inset 0 0 0 2px #000;
+}
+
+/* ── 1-BIT Terminal Wrapper ── */
+.terminal-wrapper {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 800px;
+  border: 4px solid var(--color-blood-red);
+  background-color: #000;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 10px 10px 0px rgba(255, 63, 0, 0.3);
+}
+
+.terminal-header {
+  background: var(--color-blood-red);
+  color: #000;
+  padding: 8px 16px;
+  font-family: var(--font-terminal);
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.terminal-content {
+  flex-grow: 1;
+  padding: 1.2rem 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+}
+
+/* 1-BIT 終端機滾動條 */
+.terminal-content::-webkit-scrollbar { width: 12px; }
+.terminal-content::-webkit-scrollbar-track { background: #000; border-left: 2px solid var(--color-blood-red); }
+.terminal-content::-webkit-scrollbar-thumb { background: var(--color-blood-red); }
+.terminal-content::-webkit-scrollbar-thumb:hover { background: #fff; }
+
+/* ── 1-BIT Counter Display ── */
+.counter-display {
+  font-family: var(--font-terminal);
+  font-size: 0.85rem;
+  opacity: 0.7;
+  color: var(--color-blood-red);
+  border-top: 1px dashed var(--color-blood-red);
+  padding-top: 6px;
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+/* ── 1-BIT Pain Box ── */
+.pain-box {
+  font-family: var(--font-terminal);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  color: var(--color-blood-red);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ── 1-BIT Zone Display ── */
+.zone-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--color-blood-red);
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  min-height: 52px;
+}
+.zone-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: brightness(0) invert(31%) sepia(98%) saturate(6630%) hue-rotate(10deg) brightness(103%) contrast(107%);
+}
+.zone-info { flex: 1; min-width: 0; }
+.zone-label-1bit {
+  font-family: var(--font-terminal);
+  font-size: 1.05rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--color-blood-red);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zone-sub {
+  font-family: var(--font-terminal);
+  font-size: 0.75rem;
+  color: var(--color-blood-red);
+  opacity: 0.6;
+}
+
+/* ── 1-BIT Mode Button ── */
+.mode-btn {
+  border: 2px solid var(--color-blood-red);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: 0s;
+  position: relative;
+  color: var(--color-blood-red);
+}
+.mode-btn:hover {
+  background-color: var(--color-blood-red);
+  color: #000;
+}
+.pixel-decor {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-blood-red);
+  margin-right: 8px;
+}
+.mode-btn:hover .pixel-decor {
+  background-color: #000;
+}
+
+/* ── 1-BIT Top Nav ── */
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--color-blood-red);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.top-nav-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--color-blood-red);
+  background: transparent;
+  color: var(--color-blood-red);
+  font-family: var(--font-terminal);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: 0s;
+}
+.top-nav-btn:hover {
+  background: var(--color-blood-red);
+  color: #000;
+}
+
 /* ── 無障礙：減少動畫 ── */
 @media (prefers-reduced-motion: reduce) {
   .fx-text-glitch::before,

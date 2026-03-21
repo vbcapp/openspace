@@ -1,0 +1,93 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const parts = [\n  {\n    text: \"請根據這張人物照片，生成一張符合以下要求的角色圖：\\n\\n\" +\n      \"【人物風格】\\n\" +\n      \"Cyberpunk pixel art portrait, glowing neon color palette, futuristic sci-fi vibe, \" +\n      \"32-bit detailed pixel art, high contrast lighting, atmospheric neon glow, \" +\n      \"retaining the subject's likeness and facial features accurately.\\n\\n\" +\n      \"【背景風格】\\n\" +\n      \"背景以紅黑色系的數據破壞感為核心，融合末日議會、魷魚遊戲的視覺元素。\" +\n      \"帶有數位隧道、矩陣代碼流、破碎的霓虹燈光效果。\" +\n      \"整體營造出賽博龐克末日感，黑暗中帶有紅色霓虹光暈。\\n\\n\" +\n      \"【重要規則】\\n\" +\n      \"1. 人物必須保留原照片的五官特徵和神韻\\n\" +\n      \"2. 不要加任何文字\\n\" +\n      \"3. 人物頭部位置在畫面上方 1/3 處\\n\" +\n      \"4. 風格統一，人物和背景要自然融合\"\n  }\n];\n\n// 加入所有參考圖片\nfor (let i = 0; i < items.length; i++) {\n  const binaryKey = Object.keys(items[i].binary)[0];\n  const binaryData = await this.helpers.getBinaryDataBuffer(i, binaryKey);\n  parts.push({\n    inline_data: {\n      mime_type: items[i].binary[binaryKey].mimeType,\n      data: binaryData.toString('base64')\n    }\n  });\n}\n\nconst body = {\n  contents: [{\n    role: \"user\",\n    parts\n  }],\n  systemInstruction: {\n    parts: [{\n      text: \"你是一個專業的賽博龐克像素藝術生成器。\" +\n        \"你的任務是將真人照片轉換成高品質的賽博龐克像素風角色圖。\" +\n        \"必須嚴格保留人物的面部特徵、髮型和神韻。\" +\n        \"背景使用紅黑色系的數位破壞感風格，帶有霓虹光暈和數據流元素。\" +\n        \"整體色調以深黑、暗紅、霓虹紅為主，點綴少量青色霓虹。\" +\n        \"不要生成任何文字或浮水印。\"\n    }]\n  },\n  generationConfig: {\n    responseModalities: [\"IMAGE\"],\n    imageConfig: {\n      aspectRatio: \"2:3\",\n      imageSize: \"1K\"\n    }\n  }\n};\n\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyAIeX6l753_VdDjq_mWfxQLl9PmiGvLnhc',\n  body,\n  json: true,\n  timeout: 120000,\n});\n\nconst imageData = response.candidates[0].content.parts[0].inlineData;\nconst buffer = Buffer.from(imageData.data, 'base64');\n\nreturn [{\n  json: { success: true },\n  binary: {\n    image: await this.helpers.prepareBinaryData(buffer, 'generated.png', imageData.mimeType)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        160
+      ],
+      "id": "59f80282-94dd-491b-9388-d01d05b916c9",
+      "name": "Generate Cyberpunk Portrait"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "範本角色",
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -20,
+        140
+      ],
+      "id": "e841208a-c663-4378-9d88-7680fa9fdb81",
+      "name": "Search files and folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AlmBBCOltjjaGcni",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        140,
+        160
+      ],
+      "id": "c0976ad3-a1e5-4b7a-96dd-15e12c3dfbf0",
+      "name": "Download file1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AlmBBCOltjjaGcni",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Download file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file1": {
+      "main": [
+        [
+          {
+            "node": "Generate Cyberpunk Portrait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "67a39a7dd1a0255b52fdc638c8f308719343233ab3bf2d62334078ef31e150b9"
+  }
+}

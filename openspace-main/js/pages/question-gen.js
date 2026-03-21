@@ -7,6 +7,39 @@ let _qgZone = null;
 let _qgQuestions = [];
 let _qgChannel = null;
 
+/* ── 1-BIT Text Scrambler ── */
+class Scrambler {
+  constructor(el) {
+    this.el = el;
+    this.chars = '█▓▒░▀▄▌▐';
+  }
+  run(raw, html) {
+    const len = Math.max(this.el.innerText.length, raw.length);
+    return new Promise(resolve => {
+      let frame = 0;
+      const interval = setInterval(() => {
+        let out = '';
+        for (let i = 0; i < len; i++) {
+          if (frame > 20 + Math.random() * 20) {
+            out += raw[i] || '';
+          } else {
+            out += this.chars[Math.floor(Math.random() * this.chars.length)];
+          }
+        }
+        this.el.innerText = out;
+        frame++;
+        if (frame > 50) {
+          clearInterval(interval);
+          this.el.innerHTML = html;
+          resolve();
+        }
+      }, 30);
+    });
+  }
+}
+
+let _qgGenCounter = 0;
+
 function _isIPad() {
   const ua = navigator.userAgent;
   // 傳統 iPad UA 或 iPadOS 桌面模式（Macintosh + 觸控）
@@ -60,16 +93,48 @@ async function renderQuestionGenPage(params) {
   return container;
 }
 
+/* DEV: mock zone data keyed by zone id */
+const _MOCK_ZONE_MAP = {
+  1: { id: 1, zone_name: 'PRIDE // 驕傲之塔', is_locked: false, current_question_id: 'q1', questions: { id: 'q1', content: '如果AI能<span class="invert-hl">完美預測</span>每個人的未來，你會選擇知道自己的命運嗎？', source_type: 'classic', created_at: '2026-03-18T10:00:00Z' } },
+  2: { id: 2, zone_name: 'GREED // 全知之貪', is_locked: false, current_question_id: 'q2', questions: { id: 'q2', content: '當AI掌握了全球<span class="invert-hl">財富分配</span>的權力，你願意讓它決定你能擁有多少？', source_type: 'classic', created_at: '2026-03-18T10:05:00Z' } },
+  3: { id: 3, zone_name: 'LUST // 色慾之鏡', is_locked: true, current_question_id: 'q3', questions: { id: 'q3', content: '如果AI能創造出<span class="invert-hl">完美的虛擬伴侶</span>，你還會追求真實的人際關係嗎？', source_type: 'classic', created_at: '2026-03-18T10:10:00Z' } },
+  4: { id: 4, zone_name: 'GLUTTONY // 暴食之腦', is_locked: false, current_question_id: 'q4', questions: { id: 'q4', content: '當AI可以直接向你的大腦<span class="invert-hl">注入快樂</span>，你會放棄真實的體驗嗎？', source_type: 'ai', created_at: '2026-03-18T10:15:00Z' } },
+  5: { id: 5, zone_name: 'SLOTH // 存在之墓', is_locked: false, current_question_id: null, questions: null },
+  6: { id: 6, zone_name: 'WRATH // 全知之怒', is_locked: false, current_question_id: 'q6', questions: { id: 'q6', content: '如果AI判定某人未來會犯罪，你支持在他<span class="invert-hl">行動之前</span>就逮捕他嗎？', source_type: 'classic', created_at: '2026-03-18T10:25:00Z' } },
+  7: { id: 7, zone_name: 'ENVY // 完美之妒', is_locked: true, current_question_id: 'q7', questions: { id: 'q7', content: '當AI讓每個人都能擁有<span class="invert-hl">完美的外貌</span>，「美」還有意義嗎？', source_type: 'classic', created_at: '2026-03-18T10:30:00Z' } },
+  8: { id: 8, zone_name: 'CROSS-ZONE // 跨區極限', is_locked: false, current_question_id: 'q8', questions: { id: 'q8', content: '如果必須在<span class="invert-hl">人類自由意志</span>和AI帶來的世界和平之間選擇，你選哪個？', source_type: 'classic', created_at: '2026-03-18T10:35:00Z' } },
+};
+
+const _MOCK_HISTORY = [
+  { id: 'h1', content: '當AI的智慧<span class="invert-hl">超越人類</span>，我們還有權關掉它嗎？', source_type: 'classic', created_at: '2026-03-18T09:00:00Z' },
+  { id: 'h2', content: '如果AI能讓你<span class="invert-hl">永生不死</span>，但代價是放棄所有情感，你願意嗎？', source_type: 'ai', created_at: '2026-03-18T08:30:00Z' },
+];
+
 async function _initQuestionGenPage() {
   const content = document.getElementById('qgContent');
   if (!content) return;
 
   try {
-    _qgZone = await ZonesAPI.getZone(_qgZoneId);
-    if (!_qgZone) {
+    let zone = null;
+    try {
+      zone = await ZonesAPI.getZone(_qgZoneId);
+    } catch (e) {
+      console.warn('getZone API failed');
+    }
+
+    // DEV fallback: use mock data if no auth/data
+    if (!zone) {
+      zone = _MOCK_ZONE_MAP[_qgZoneId];
+    }
+    if (!zone) {
       content.innerHTML = '<div style="text-align:center;padding:var(--space-8) 0;color:var(--color-error);">找不到此區域</div>';
       return;
     }
+    _qgZone = zone;
+
+    // Update header title
+    const titleEl = document.getElementById('qgTitle');
+    if (titleEl) titleEl.textContent = zone.zone_name;
 
     // 若已鎖定，直接顯示鎖定頁面
     if (_qgZone.is_locked && _qgZone.current_question_id) {
@@ -77,9 +142,17 @@ async function _initQuestionGenPage() {
       return;
     }
 
-    _qgQuestions = await QuestionsAPI.getQuestionsByZone(_qgZoneId);
+    try {
+      _qgQuestions = await QuestionsAPI.getQuestionsByZone(_qgZoneId);
+    } catch (e) {
+      _qgQuestions = _MOCK_HISTORY;
+    }
+    if (!_qgQuestions || _qgQuestions.length === 0) {
+      _qgQuestions = _MOCK_HISTORY;
+    }
+
     _renderQuestionGenPanel(content);
-    _subscribeZoneChanges();
+    try { _subscribeZoneChanges(); } catch(e) {}
   } catch (err) {
     console.error('_initQuestionGenPage:', err);
     content.innerHTML = '<div style="text-align:center;padding:var(--space-8) 0;color:var(--color-error);">載入失敗</div>';
@@ -89,105 +162,84 @@ async function _initQuestionGenPage() {
 function _renderQuestionGenPanel(content) {
   const currentQ = _qgZone.questions;
   const hasCurrentQ = currentQ && currentQ.content;
+  const logo = typeof _ZONE_LOGOS !== 'undefined' ? _ZONE_LOGOS[_qgZoneId] : null;
+  const nameParts = (_qgZone.zone_name || '').split(' // ');
+  const enName = nameParts[0] || _qgZone.zone_name;
+  const zhName = nameParts[1] || '';
+  const isCross = _qgZoneId === 8;
 
   content.innerHTML = `
-    <!-- 區域資訊 -->
-    <div class="qg-zone-info">
-      <span class="qg-zone-info__name">${_qgZone.zone_name}</span>
-      <span class="qg-zone-info__status ${_qgZone.is_locked ? 'qg-zone-info__status--locked' : ''}">
-        ${_qgZone.is_locked ? '已鎖定' : '未鎖定'}
-      </span>
-    </div>
-
-    <!-- 當前題目 -->
-    ${hasCurrentQ ? `
-      <div class="qg-current-question">
-        <div class="qg-section-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-          目前題目
-        </div>
-        <div class="qg-question-card">
-          <p class="qg-question-card__text">${_escapeHtml(currentQ.content)}</p>
-          <div class="qg-question-card__meta">
-            <span class="data-label">${currentQ.source_type === 'ai' ? 'AI 生成' : '手動'}</span>
-          </div>
-        </div>
-        ${_isIPad() ? `
-        <div class="qg-lock-actions">
-          <button class="btn btn--primary btn--full" id="qgLockBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-            鎖定並顯示 QR Code
-          </button>
-        </div>
-        ` : ''}
-      </div>
-    ` : ''}
-
-    <!-- 出題方式切換 -->
-    <div class="qg-mode-switch">
-      <div class="qg-section-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-        建立題目
-      </div>
-      <div class="qg-tabs">
-        <button class="qg-tab qg-tab--active" data-mode="manual">手動出題</button>
-        <button class="qg-tab" data-mode="ai">AI 出題</button>
+    <!-- 1-BIT Zone Display -->
+    <div class="zone-display" style="display:flex;">
+      ${isCross
+        ? '<div style="width:40px;height:40px;flex-shrink:0;border:2px solid var(--color-blood-red);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:bold;color:var(--color-blood-red);">X</div>'
+        : (logo ? `<img src="${logo}" alt="${enName}" class="zone-logo">` : '')}
+      <div class="zone-info">
+        <div class="zone-label-1bit">${enName}</div>
+        <div class="zone-sub">${zhName}</div>
       </div>
     </div>
 
-    <!-- 手動出題表單 -->
-    <div id="qgFormManual" class="qg-form">
-      <div class="form-field">
-        <label class="form-field__label">題目內容</label>
-        <textarea class="textarea" id="qgQuestionText" rows="4" placeholder="輸入題目內容..."></textarea>
-        <span class="form-field__hint" id="qgCharCount">0 / 500</span>
-      </div>
-      <button class="btn btn--primary btn--full" id="qgSubmitBtn">
-        儲存題目
-      </button>
+    <!-- Loader Bar -->
+    <div class="loader-box" id="qgLoaderBox">
+      <div class="loader-bar" id="qgLoaderBar"></div>
     </div>
 
-    <!-- AI 出題表單 -->
-    <div id="qgFormAI" class="qg-form" style="display:none;">
-      <div class="form-field">
-        <label class="form-field__label">主題 / 關鍵字</label>
-        <input type="text" class="input" id="qgAIKeyword" placeholder="輸入主題或關鍵字，例：資源分配、AI倫理..." />
-      </div>
-      <button class="btn btn--primary btn--full" id="qgAIBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-        </svg>
-        AI 生成題目
-      </button>
+    <!-- 題目顯示區（scrambler target） -->
+    <div class="output-text" id="qgOutputText">
+      ${hasCurrentQ ? renderQuestionHtml(currentQ.content) : '[ SYSTEM READY ]<br>WAITING FOR INPUT...'}
+    </div>
+
+    <!-- Pain point / meta -->
+    <div class="pain-box" id="qgPainBox">
+      ${hasCurrentQ ? '<span class="blink">_</span> >> CURRENT QUESTION // ' + (currentQ.source_type === 'ai' ? 'AI GENERATED' : 'MANUAL / BANK') : ''}
+    </div>
+
+    <!-- 出題方式切換 Tab -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="qg-tab qg-tab--active" data-mode="execute" style="flex:1;">>>> EXECUTE 抽題</button>
+      <button class="qg-tab" data-mode="manual" style="flex:1;">手動出題</button>
+    </div>
+
+    <!-- 抽題模式（預設顯示） -->
+    <div id="qgFormExecute">
+      <button class="action-btn" id="qgExecuteBtn">>>> EXECUTE</button>
       <div id="qgAIResult"></div>
     </div>
 
+    <!-- 手動出題表單（隱藏） -->
+    <div id="qgFormManual" style="display:none;">
+      <div class="form-field" style="margin-bottom:12px;">
+        <label class="form-field__label" style="color:var(--color-blood-red);">題目內容</label>
+        <textarea class="textarea" id="qgQuestionText" rows="4" placeholder="輸入題目內容..."></textarea>
+        <span class="form-field__hint" id="qgCharCount" style="color:rgba(255,63,0,0.5);">0 / 500</span>
+      </div>
+      <button class="action-btn" id="qgSubmitBtn">>>> SAVE</button>
+    </div>
+
+    <!-- Counter Display -->
+    <div class="counter-display">
+      <span id="qgSeedUI">ID: 000000</span>
+      <span id="qgGenCount">GEN: ${_qgGenCounter}</span>
+    </div>
+
+    ${hasCurrentQ ? `
+    <div style="margin-top:12px;">
+      <button class="action-btn" id="qgLockBtn" style="border-width:2px;">LOCK & SHOW QR CODE</button>
+    </div>
+    ` : ''}
+
     <!-- 歷史題目 -->
     ${_qgQuestions.length > 0 ? `
-      <div class="qg-history">
-        <div class="qg-section-title" style="margin-top:var(--space-6);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-          </svg>
-          歷史題目
-        </div>
-        ${_qgQuestions.map(q => `
+      <div style="margin-top:16px;border-top:1px dashed var(--color-blood-red);padding-top:12px;">
+        <div style="font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;opacity:0.7;">HISTORY (${_qgQuestions.length})</div>
+        ${_qgQuestions.slice(0, 5).map(q => `
           <div class="qg-history-item" data-question-id="${q.id}">
-            <p class="qg-history-item__text">${_escapeHtml(q.content)}</p>
+            <p class="qg-history-item__text">${renderQuestionHtml(q.content)}</p>
             <div class="qg-history-item__meta">
-              <span class="data-label">${q.source_type === 'ai' ? 'AI' : '手動'}</span>
-              <span class="data-label">${new Date(q.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-              <button class="btn btn--ghost btn--sm qg-use-btn" data-question-id="${q.id}">使用此題</button>
+              <span style="font-size:0.75rem;opacity:0.6;">${q.source_type === 'ai' ? 'AI' : 'MANUAL'}</span>
+              <span style="font-size:0.75rem;opacity:0.6;">${new Date(q.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <button class="top-nav-btn qg-use-btn" data-question-id="${q.id}">USE</button>
             </div>
           </div>
         `).join('')}
@@ -206,27 +258,29 @@ function _bindQuestionGenEvents(content) {
     textarea.addEventListener('input', () => {
       const len = textarea.value.length;
       charCount.textContent = `${len} / 500`;
-      if (len > 500) charCount.style.color = 'var(--color-error)';
-      else charCount.style.color = 'var(--color-text-muted)';
+      if (len > 500) charCount.style.color = '#ff0000';
+      else charCount.style.color = 'rgba(255,63,0,0.5)';
     });
   }
 
-  // Tab 切換
+  // Tab 切換（execute / manual）
   content.querySelectorAll('.qg-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       content.querySelectorAll('.qg-tab').forEach(t => t.classList.remove('qg-tab--active'));
       tab.classList.add('qg-tab--active');
       const mode = tab.dataset.mode;
-      document.getElementById('qgFormManual').style.display = mode === 'manual' ? 'block' : 'none';
-      document.getElementById('qgFormAI').style.display = mode === 'ai' ? 'block' : 'none';
+      const execForm = document.getElementById('qgFormExecute');
+      const manualForm = document.getElementById('qgFormManual');
+      if (execForm) execForm.style.display = mode === 'execute' ? 'block' : 'none';
+      if (manualForm) manualForm.style.display = mode === 'manual' ? 'block' : 'none';
     });
   });
 
+  // EXECUTE 抽題
+  document.getElementById('qgExecuteBtn')?.addEventListener('click', () => _generateAIQuestion());
+
   // 手動出題提交
   document.getElementById('qgSubmitBtn')?.addEventListener('click', () => _submitManualQuestion());
-
-  // AI 出題
-  document.getElementById('qgAIBtn')?.addEventListener('click', () => _generateAIQuestion());
 
   // 鎖定按鈕
   document.getElementById('qgLockBtn')?.addEventListener('click', () => _lockZoneAndShowQR());
@@ -238,7 +292,7 @@ function _bindQuestionGenEvents(content) {
       const qId = btn.dataset.questionId;
       try {
         btn.disabled = true;
-        btn.textContent = '設定中...';
+        btn.textContent = 'SETTING...';
         await ZonesAPI.setCurrentQuestion(_qgZoneId, qId);
         _qgZone = await ZonesAPI.getZone(_qgZoneId);
         _renderQuestionGenPanel(document.getElementById('qgContent'));
@@ -246,93 +300,96 @@ function _bindQuestionGenEvents(content) {
         console.error('setCurrentQuestion:', err);
         alert('設定失敗');
         btn.disabled = false;
-        btn.textContent = '使用此題';
+        btn.textContent = 'USE';
       }
     });
   });
 }
 
-/* ── AI 出題流程 ── */
-async function _generateAIQuestion() {
-  const keyword = document.getElementById('qgAIKeyword')?.value.trim();
-  const btn = document.getElementById('qgAIBtn');
+/* ── 題庫抽題流程（含 loader + scrambler 動畫） ── */
+let _qgBusy = false;
+
+function _generateAIQuestion() {
+  if (_qgBusy) return;
+  _qgBusy = true;
+  _qgGenCounter++;
+
+  const outputEl = document.getElementById('qgOutputText');
+  const painEl = document.getElementById('qgPainBox');
+  const loaderBox = document.getElementById('qgLoaderBox');
+  const loaderBar = document.getElementById('qgLoaderBar');
   const resultDiv = document.getElementById('qgAIResult');
-  if (!keyword || !btn || !resultDiv) return;
+  const genCountEl = document.getElementById('qgGenCount');
+  const seedEl = document.getElementById('qgSeedUI');
 
-  if (!keyword) {
-    document.getElementById('qgAIKeyword')?.classList.add('input--error');
-    return;
-  }
+  if (!outputEl || !loaderBox) { _qgBusy = false; return; }
 
-  // 顯示載入狀態
-  btn.disabled = true;
-  resultDiv.innerHTML = `
-    <div class="qg-ai-loading">
-      <div class="qg-ai-loading__spinner"></div>
-      <div class="qg-ai-loading__text">AI 正在生成題目...</div>
-    </div>
-  `;
+  // 從 QuestionBank 抽一題
+  const picked = QuestionBank.pickRandom(_qgZoneId);
+  const questionHtml = picked.content;
+  const questionRaw = questionHtml.replace(/<[^>]*>/g, '');
 
-  try {
-    const data = await AIQuestionAPI.generateQuestion(keyword, _qgZone?.zone_name || '');
-    const questionText = data.question;
+  // Pain point 顯示
+  const zoneEnName = (_qgZone.zone_name || '').split(' // ')[0];
+  const painText = '>> ZONE: ' + zoneEnName + ' // BILL #' + _qgGenCounter;
 
-    if (!questionText) throw new Error('未能生成題目');
+  // Update counter
+  if (genCountEl) genCountEl.textContent = 'GEN: ' + _qgGenCounter;
+  if (seedEl) seedEl.textContent = 'ID: ' + Math.random().toString(16).substr(2, 6).toUpperCase();
 
-    // 顯示預覽
-    resultDiv.innerHTML = `
-      <div class="qg-ai-preview">
-        <div class="qg-ai-preview__label">AI 生成預覽</div>
-        <p class="qg-ai-preview__text">${_escapeHtml(questionText)}</p>
-        <div class="qg-ai-preview__actions">
-          <button class="btn btn--primary" id="qgAISaveBtn">確認使用</button>
-          <button class="btn btn--ghost" id="qgAIRetryBtn">重新生成</button>
-        </div>
-      </div>
-    `;
+  // 清空 pain + 結果區
+  if (painEl) painEl.innerHTML = '';
+  if (resultDiv) resultDiv.innerHTML = '';
 
-    // 確認儲存
-    document.getElementById('qgAISaveBtn')?.addEventListener('click', async () => {
-      const saveBtn = document.getElementById('qgAISaveBtn');
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '儲存中...'; }
+  // Show loader
+  loaderBox.style.display = 'block';
+  loaderBar.style.width = '0%';
 
-      try {
-        const question = await QuestionsAPI.createQuestion(_qgZoneId, questionText, 'ai');
-        await ZonesAPI.setCurrentQuestion(_qgZoneId, question.id);
-        _qgZone = await ZonesAPI.getZone(_qgZoneId);
-        _qgQuestions = await QuestionsAPI.getQuestionsByZone(_qgZoneId);
-        _renderQuestionGenPanel(document.getElementById('qgContent'));
-      } catch (err) {
-        console.error('AI save:', err);
-        alert('儲存失敗：' + (err.message || '未知錯誤'));
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '確認使用'; }
-      }
-    });
+  let w = 0;
+  const loaderInterval = setInterval(() => {
+    w += 10;
+    loaderBar.style.width = w + '%';
+    if (w >= 100) {
+      clearInterval(loaderInterval);
+      loaderBox.style.display = 'none';
 
-    // 重新生成
-    document.getElementById('qgAIRetryBtn')?.addEventListener('click', () => _generateAIQuestion());
+      // Scrambler 動畫
+      const scrambler = new Scrambler(outputEl);
+      scrambler.run(questionRaw, renderQuestionHtml(questionHtml)).then(() => {
+        if (painEl) painEl.innerHTML = '<span class="blink">_</span> ' + painText;
+        _qgBusy = false;
 
-  } catch (err) {
-    console.error('AI generate:', err);
-    resultDiv.innerHTML = `
-      <div class="qg-ai-error">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <span>AI 生成失敗：${_escapeHtml(err.message || '請稍後再試')}。可切換至手動出題模式。</span>
-      </div>
-    `;
-  }
+        // 顯示確認/再抽按鈕
+        if (resultDiv) {
+          resultDiv.innerHTML = `
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button class="action-btn" id="qgAISaveBtn" style="flex:1;border-width:2px;font-size:1rem;">CONFIRM & SAVE</button>
+              <button class="top-nav-btn" id="qgAIRetryBtn" style="padding:8px 12px;">REROLL</button>
+            </div>
+          `;
 
-  btn.disabled = false;
-  btn.innerHTML = `
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-    </svg>
-    AI 生成題目
-  `;
+          setTimeout(() => {
+            document.getElementById('qgAISaveBtn')?.addEventListener('click', async () => {
+              const saveBtn = document.getElementById('qgAISaveBtn');
+              if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'SAVING...'; }
+              try {
+                const question = await QuestionsAPI.createQuestion(_qgZoneId, questionHtml, 'manual');
+                await ZonesAPI.setCurrentQuestion(_qgZoneId, question.id);
+                _qgZone = await ZonesAPI.getZone(_qgZoneId);
+                _qgQuestions = await QuestionsAPI.getQuestionsByZone(_qgZoneId);
+                _renderQuestionGenPanel(document.getElementById('qgContent'));
+              } catch (err) {
+                console.error('Bank save error:', err);
+                alert('儲存失敗：' + (err.message || '未知錯誤'));
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'CONFIRM & SAVE'; }
+              }
+            });
+            document.getElementById('qgAIRetryBtn')?.addEventListener('click', () => _generateAIQuestion());
+          }, 0);
+        }
+      });
+    }
+  }, 30);
 }
 
 async function _submitManualQuestion() {
@@ -397,6 +454,17 @@ function _renderLockedPage(content) {
   const questionText = _qgZone.questions?.content || '';
   const qrUrl = `${window.location.origin}${window.location.pathname}#/answer/${questionId}`;
 
+  // Zone info
+  const nameParts = (_qgZone.zone_name || '').split(' // ');
+  const enName = nameParts[0] || _qgZone.zone_name;
+  const zhName = nameParts[1] || '';
+  const logo = typeof _ZONE_LOGOS !== 'undefined' ? _ZONE_LOGOS[_qgZoneId] : null;
+  const isCross = _qgZoneId === 8;
+
+  const logoHtml = isCross
+    ? `<div style="width:48px;height:48px;flex-shrink:0;border:3px solid var(--color-blood-red);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:bold;color:var(--color-blood-red);">X</div>`
+    : (logo ? `<img src="${logo}" alt="${enName}" style="width:48px;height:48px;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(31%) sepia(98%) saturate(6630%) hue-rotate(10deg) brightness(103%) contrast(107%);">` : '');
+
   // 隱藏 nav bar
   const navBar = document.getElementById('navBar');
   if (navBar) navBar.style.display = 'none';
@@ -408,38 +476,65 @@ function _renderLockedPage(content) {
   }
 
   content.innerHTML = `
-    <div class="qg-locked-page">
-      <div class="qg-locked-page__header">
-        <span class="qg-locked-page__zone fx-text-glitch" data-text="${_qgZone.zone_name}">${_qgZone.zone_name}</span>
-        <span class="qg-locked-page__badge">已鎖定</span>
+    <div class="qg-locked-page scan-line-anim">
+      <!-- Terminal Header -->
+      <div style="width:100%;max-width:600px;border:4px solid var(--color-blood-red);background:#000;box-shadow:10px 10px 0px rgba(255,63,0,0.3);">
+        <div class="terminal-header" style="font-size:1.4rem;">
+          <span>LOCKED</span>
+          <span class="blink" style="font-size:0.9rem;">[ACTIVE]</span>
+        </div>
+
+        <div style="padding:1.5rem;">
+          <!-- Zone Display -->
+          <div class="zone-display" style="margin-bottom:16px;">
+            ${logoHtml}
+            <div class="zone-info">
+              <div class="zone-label-1bit" style="font-size:1.3rem;">${enName}</div>
+              ${zhName ? `<div class="zone-sub">${zhName}</div>` : ''}
+            </div>
+          </div>
+
+          <!-- Question -->
+          <div class="output-text" id="qgLockedQuestion" style="font-size:clamp(1.1rem,3vw,1.5rem);text-align:center;">
+            ${renderQuestionHtml(questionText)}
+          </div>
+
+          <!-- QR Code -->
+          <div style="display:flex;justify-content:center;margin:16px 0;">
+            <div class="qg-locked-page__qr" id="qgQRContainer" style="display:inline-block;">
+              <div class="blink" style="padding:2rem;">GENERATING QR...</div>
+            </div>
+          </div>
+
+          <!-- URL -->
+          <div style="text-align:center;margin-bottom:12px;">
+            <div style="font-size:0.8rem;text-transform:uppercase;margin-bottom:4px;opacity:0.7;">// SCAN TO RESPOND</div>
+            <div style="font-size:0.7rem;opacity:0.5;word-break:break-all;">${qrUrl}</div>
+          </div>
+
+          <!-- Counter -->
+          <div class="counter-display">
+            <span>ZONE: ${enName}</span>
+            <span>Q-${questionId?.slice(0, 8) || '???'}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="qg-locked-page__question">
-        <p>${_escapeHtml(questionText)}</p>
-      </div>
-
-      <div class="qg-locked-page__qr" id="qgQRContainer">
-        <div class="subtitle-cyber">正在產生 QR Code...</div>
-      </div>
-
-      <div class="qg-locked-page__url">
-        <span class="data-label">掃描作答</span>
-        <span class="qg-locked-page__url-text">${qrUrl}</span>
-      </div>
-
-      ${_isIPad() ? `
       <div class="qg-locked-page__unlock">
-        <button class="btn btn--ghost" id="qgUnlockBtn" style="font-size:var(--text-xs);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 5-5 5 5 0 0 1 5 5"></path>
-          </svg>
-          解鎖
-        </button>
+        <button class="action-btn" id="qgUnlockBtn" style="border-width:2px;font-size:0.9rem;width:auto;padding:8px 16px;">[UNLOCK] 解鎖</button>
       </div>
-      ` : ''}
     </div>
   `;
+
+  // Scrambler on locked question text
+  setTimeout(() => {
+    const lockedQEl = document.getElementById('qgLockedQuestion');
+    if (lockedQEl && questionText) {
+      const rawText = questionText.replace(/<[^>]*>/g, '');
+      const scrambler = new Scrambler(lockedQEl);
+      scrambler.run(rawText, renderQuestionHtml(questionText));
+    }
+  }, 50);
 
   // 生成 QR Code
   setTimeout(() => {
@@ -456,9 +551,9 @@ function _renderLockedPage(content) {
       });
     } else if (qrContainer) {
       qrContainer.innerHTML = `
-        <div style="color:var(--color-text-muted);font-size:var(--text-sm);">
+        <div style="font-size:0.85rem;opacity:0.7;">
           QR Code 庫未載入<br>
-          <span style="font-family:var(--font-mono);font-size:var(--text-xs);word-break:break-all;">${qrUrl}</span>
+          <span style="font-size:0.75rem;word-break:break-all;">${qrUrl}</span>
         </div>
       `;
     }

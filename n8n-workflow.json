@@ -1,0 +1,167 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        32
+      ],
+      "id": "a1b2c3d4-trigger-node",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "17csW3gTK3WTBdFz",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -280,
+        32
+      ],
+      "id": "370b3d90-83ac-4c38-9b1b-4cd933ddaafa",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "17csW3gTK3WTBdFz",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {},
+        "prompt": "請根據這張圖片的內容，用溫暖、生活感的語氣寫一段適合 Instagram 限動的短文案（50字以內）。文案要能搭配這張圖片的氛圍。"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -80,
+        32
+      ],
+      "id": "b2c3d4e5-llm-chain",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $('Basic LLM Chain1').item.json.text;\n\nconst parts = [\n  { text: \"請根據以下文案生成一張示意圖：\" + text }\n];\n\nfor (let i = 0; i < items.length; i++) {\n  const binaryKey = Object.keys(items[i].binary)[0];\n  const binaryData = await this.helpers.getBinaryDataBuffer(i, binaryKey);\n  parts.push({\n    inline_data: {\n      mime_type: items[i].binary[binaryKey].mimeType,\n      data: binaryData.toString('base64')\n    }\n  });\n}\n\nconst body = {\n  contents: [{\n    role: \"user\",\n    parts\n  }],\n  systemInstruction: {\n    parts: [{\n      text: \"你生成的圖片必須嚴格遵守參考圖片的風格：暖色調的木質質感、生活感的構圖、以及自然的柔和光影。不要生成太像廣告的高對比圖，要像是一位朋友隨手拍下的美好瞬間。\"\n    }]\n  },\n  generationConfig: {\n    responseModalities: [\"IMAGE\"],\n    imageConfig: {\n      aspectRatio: \"9:16\",\n      imageSize: \"1K\"\n    }\n  }\n};\n\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=AIzaSyAIeX6l753_VdDjq_mWfxQLl9PmiGvLnhc',\n  body,\n  json: true,\n  timeout: 120000,\n});\n\nconst imageData = response.candidates[0].content.parts[0].inlineData;\nconst buffer = Buffer.from(imageData.data, 'base64');\n\nreturn [{\n  json: { success: true },\n  binary: {\n    image: await this.helpers.prepareBinaryData(buffer, 'generated.png', imageData.mimeType)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        32
+      ],
+      "id": "fb089a7f-bde8-4d7e-a085-83728bb6ee76",
+      "name": "Generate Image with Gemini"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "folderId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "name": "=generated_{{ $now.format('yyyyMMdd_HHmmss') }}.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        360,
+        32
+      ],
+      "id": "c3d4e5f6-upload-node",
+      "name": "Upload to Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "17csW3gTK3WTBdFz",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Generate Image with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Upload to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "430ed00c3f18d86e96ab07a7734c50d7eff07fe154d94d4c29925dc67a338a8e"
+  }
+}

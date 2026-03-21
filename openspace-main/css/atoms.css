@@ -14,7 +14,7 @@
   color: var(--color-text-primary);
   background: rgba(0, 0, 0, 0.7);
   padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   text-shadow: 0 0 5px var(--color-blood-red);
 }
 
@@ -26,16 +26,16 @@
 
 /* ── Button ── */
 .btn {
-  font-family: var(--font-ui);
-  font-weight: var(--weight-bold);
+  font-family: var(--font-terminal);
+  font-weight: bold;
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   padding: var(--space-2) var(--space-6);
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  border-radius: 0;
+  border: 2px solid var(--color-blood-red);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-default);
+  transition: 0s;
   position: relative;
   overflow: hidden;
   display: inline-flex;
@@ -46,37 +46,36 @@
 
 .btn--primary {
   background: var(--color-blood-red);
-  color: var(--color-text-primary);
+  color: #000;
   border-color: var(--color-blood-red);
-  box-shadow: var(--shadow-glow-red);
 }
 .btn--primary:hover {
-  background: #e60036;
-  box-shadow: 0 0 30px rgba(255, 0, 60, 0.5);
+  background: #000;
+  color: var(--color-blood-red);
 }
 .btn--primary:active {
-  transform: scale(0.97);
+  transform: translateY(2px);
 }
 
 .btn--secondary {
   background: transparent;
   color: var(--color-blood-red);
-  border-color: var(--color-border-active);
+  border-color: var(--color-blood-red);
 }
 .btn--secondary:hover {
-  background: rgba(255, 0, 60, 0.1);
-  box-shadow: var(--shadow-glow-red);
+  background: var(--color-blood-red);
+  color: #000;
 }
 
 .btn--ghost {
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--color-blood-red);
   border-color: transparent;
   padding: var(--space-2) var(--space-4);
 }
 .btn--ghost:hover {
-  color: var(--color-cyber-cyan);
-  text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+  background: var(--color-blood-red);
+  color: #000;
 }
 
 .btn:disabled {
@@ -89,52 +88,50 @@
 .btn--lg { font-size: var(--text-base); padding: var(--space-3) var(--space-8); }
 .btn--full { width: 100%; }
 
-/* ── Input ── */
+/* ── Input (1-BIT) ── */
 .input {
-  font-family: var(--font-mono);
+  font-family: var(--font-terminal);
   font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  color: var(--color-blood-red);
+  background: #000;
+  border: 2px solid var(--color-blood-red);
+  border-radius: 0;
   padding: var(--space-3) var(--space-4);
   width: 100%;
   outline: none;
-  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+  transition: 0s;
 }
 
 .input::placeholder {
-  color: var(--color-text-muted);
+  color: rgba(255, 63, 0, 0.4);
 }
 
 .input:focus {
-  border-color: var(--color-blood-red);
-  box-shadow: var(--shadow-glow-red);
+  background: rgba(255, 63, 0, 0.05);
 }
 
 .input--error {
-  border-color: var(--color-error);
+  border-color: #ff0000;
 }
 
-/* ── Textarea ── */
+/* ── Textarea (1-BIT) ── */
 .textarea {
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  font-family: var(--font-terminal);
+  font-size: var(--text-base);
+  color: var(--color-blood-red);
+  background: #000;
+  border: 2px solid var(--color-blood-red);
+  border-radius: 0;
   padding: var(--space-3) var(--space-4);
   width: 100%;
   min-height: 100px;
   resize: vertical;
   outline: none;
-  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+  transition: 0s;
 }
 
 .textarea:focus {
-  border-color: var(--color-blood-red);
-  box-shadow: var(--shadow-glow-red);
+  background: rgba(255, 63, 0, 0.05);
 }
 
 /* ── Avatar ── */
@@ -184,7 +181,7 @@
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);

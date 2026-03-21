@@ -11,19 +11,19 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
-  -webkit-font-smoothing: antialiased;
+}
+
+/* 1-BIT：全局取消字體平滑，追求像素感 */
+* {
+  -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: var(--font-ui);
+  font-family: var(--font-terminal);
   font-weight: var(--weight-medium);
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-void);
-  background-image:
-    linear-gradient(rgba(255, 0, 60, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 0, 60, 0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
+  color: var(--color-blood-red);
+  background-color: #000000;
   min-height: 100vh;
   min-height: 100dvh;
   line-height: var(--leading-normal);
@@ -60,22 +60,23 @@ input, textarea, select {
   outline: none;
 }
 
-/* 滾動條樣式 */
+/* 1-BIT 滾動條 */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 12px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+  background: #000;
+  border-left: 2px solid var(--color-blood-red);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
-  border-radius: var(--radius-full);
+  background: var(--color-blood-red);
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-blood-red);
+  background: #fff;
 }
 
 /* 選取文字顏色 */

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,11 @@
             src: url('Fonts/HATTEN.TTF') format('truetype');
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
             background: #0a0a0a;
@@ -39,8 +44,13 @@
             will-change: transform;
         }
 
-        .card-upright { z-index: 2; }
-        .card-inverted { z-index: 1; }
+        .card-upright {
+            z-index: 2;
+        }
+
+        .card-inverted {
+            z-index: 1;
+        }
 
         .card .border {
             position: absolute;
@@ -80,6 +90,7 @@
         .card-upright .border {
             clip-path: polygon(37% 0%, 63% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
         }
+
         .card-upright .image {
             clip-path: polygon(39% 2.8%, 61% 2.8%, 97% 86%, 90% 97%, 10% 97%, 3% 86%);
         }
@@ -88,6 +99,7 @@
         .card-inverted .border {
             clip-path: polygon(8% 0%, 92% 0%, 100% 14%, 63% 100%, 37% 100%, 0% 14%);
         }
+
         .card-inverted .image {
             clip-path: polygon(10% 3%, 90% 3%, 97% 14%, 61% 97.2%, 39% 97.2%, 3% 14%);
         }
@@ -96,6 +108,7 @@
         .card:hover .border {
             background: #ff2040;
         }
+
         .card:hover .image img {
             filter: brightness(0.75) saturate(1.5);
         }
@@ -104,9 +117,11 @@
         .card.selected {
             z-index: 20 !important;
         }
+
         .card.selected .border {
             background: #ff3050;
         }
+
         .card.selected .image img {
             filter: brightness(0.9) saturate(1.4);
         }
@@ -115,28 +130,81 @@
         .eye-container {
             position: fixed;
             z-index: 10;
-            filter: drop-shadow(0 0 40px rgba(230, 0, 18, 0.5))
-                    drop-shadow(0 0 80px rgba(230, 0, 18, 0.2));
+            filter: drop-shadow(0 0 40px rgba(230, 0, 18, 0.5)) drop-shadow(0 0 80px rgba(230, 0, 18, 0.2));
+            transition: filter 0.3s ease;
         }
 
+        /* 影片層：閒置時顯示 */
         .eye-container video {
+            position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
-            /* 頂部窄邊縮短，遮擋白色背景 */
             clip-path: polygon(44% 0%, 56% 0%, 100% 86%, 92% 100%, 8% 100%, 0% 86%);
+            z-index: 3;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .eye-container video.hidden {
+            opacity: 0;
+        }
+
+        /* 外框：固定不動 */
+        .eye-container .eye-frame {
+            position: absolute;
+            width: 115%;
+            height: 115%;
+            top: -7%;
+            left: -9.75%;
+            object-fit: contain;
+            z-index: 1;
+        }
+
+        /* 眼球：會移動 */
+        .eye-container .eyeball {
+            position: absolute;
+            width: 26%;
+            height: auto;
+            top: 62%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.15s ease-out;
+            z-index: 2;
+        }
+
+        /* 追蹤時紅光加強 */
+        .eye-container.tracking {
+            filter: drop-shadow(0 0 50px rgba(230, 0, 18, 0.7)) drop-shadow(0 0 100px rgba(230, 0, 18, 0.35));
+        }
+
+        /* 隱藏的攝影機 */
+        #webcam {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
         }
     </style>
 </head>
+
 <body>
 
+    <video id="webcam" autoplay playsinline></video>
     <div class="tunnel-bg"></div>
     <div class="grid" id="grid"></div>
 
     <div class="eye-container" id="eyeContainer">
-        <video autoplay loop muted playsinline>
+        <img class="eyeball" id="eyeball" src="眼球.png" alt="eyeball">
+        <img class="eye-frame" src="編匡.png" alt="frame">
+        <video id="eyeVideo" autoplay loop muted playsinline>
             <source src="眼睛LOGO眨眼.mp4" type="video/mp4">
+            <source src="眼睛LOGO眨眼_h264.mp4" type="video/mp4">
         </video>
     </div>
 
@@ -146,20 +214,20 @@
             const eyeContainer = document.getElementById('eyeContainer');
 
             /* ---- 參數（與排列測試CSS.html 一致） ---- */
-            const ROWS    = 7;
-            const COLS    = 19;
-            const GAP     = 0.35;
+            const ROWS = 7;
+            const COLS = 19;
+            const GAP = 0.35;
             const ROW_GAP = 0.2;
-            const MARGIN  = 2;
+            const MARGIN = 2;
 
             const vhVw = window.innerHeight / window.innerWidth * 100;
 
             const W_h = (100 - 2 * MARGIN - (COLS - 1) * GAP) / (1 + (COLS - 1) * 0.63);
             const W_v = (vhVw - 2 * MARGIN - (ROWS - 1) * ROW_GAP) / (ROWS * 1.14 * 605 / 640);
-            const W    = Math.min(W_h, W_v);
-            const H    = W * 605 / 640;
-            const SX   = W * 0.63 + GAP;
-            const SY   = 1.14 * H + ROW_GAP;
+            const W = Math.min(W_h, W_v);
+            const H = W * 605 / 640;
+            const SX = W * 0.63 + GAP;
+            const SY = 1.14 * H + ROW_GAP;
             const FONT = W * 0.11;
 
             const totalW = (COLS - 1) * SX + W;
@@ -178,17 +246,17 @@
             ]);
 
             /* ---- 眼睛影片定位 ---- */
-            const EYE_SHRINK = 0.85;          // 縮小比例，留出間隔
-            const eyeTopVw  = startYUp + 2 * SY;
-            const eyeBotVw  = startYUp + 4 * SY + H;
+            const EYE_SHRINK = 0.9;           // 比例
+            const eyeTopVw = startYUp + 2 * SY;
+            const eyeBotVw = startYUp + 4 * SY + H;
             const eyeH_full = eyeBotVw - eyeTopVw;
-            const eyeH_vw   = eyeH_full * EYE_SHRINK;
-            const eyeW_vw   = eyeH_vw * 640 / 605;
+            const eyeH_vw = eyeH_full * EYE_SHRINK;
+            const eyeW_vw = eyeH_vw * 640 / 605;
             const eyeCenterX = startX + 9 * SX + W / 2;
 
             const eyeCenterY = (eyeTopVw + eyeBotVw) / 2 + 0.15 * H;
             eyeContainer.style.cssText =
-                `left:${eyeCenterX - eyeW_vw / 2}vw;` +
+                `left:${eyeCenterX - eyeW_vw / 2 + 0.1}vw;` +
                 `top:${eyeCenterY - eyeH_vw / 2}vw;` +
                 `width:${eyeW_vw}vw;` +
                 `height:${eyeH_vw}vw;`;
@@ -202,15 +270,15 @@
             let num = 1;
 
             for (let r = 0; r < ROWS; r++) {
-                const yUp  = startYUp + r * SY;
+                const yUp = startYUp + r * SY;
                 const yInv = yUp - 0.14 * H;
 
                 for (let i = 0; i < COLS; i++) {
                     if (removed.has(`${r},${i}`)) continue;
 
                     const inv = ((r + i) % 2 === 0);
-                    const x   = startX + i * SX;
-                    const y   = inv ? yInv : yUp;
+                    const x = startX + i * SX;
+                    const y = inv ? yInv : yUp;
 
                     const card = document.createElement('div');
                     card.className = `card ${inv ? 'card-inverted' : 'card-upright'}`;
@@ -220,7 +288,7 @@
                     card.innerHTML =
                         '<div class="border"></div>' +
                         '<div class="image">' +
-                            `<img src="人物/${s}.png" alt="${s}" onerror="if(this.src.endsWith('.png')){this.src=this.src.replace('.png','.jpg')}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else{this.parentElement.style.display='none'}">` +
+                        `<img src="人物/${s}.png" alt="${s}" onerror="if(this.src.endsWith('.png')){this.src=this.src.replace('.png','.jpg')}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else{this.parentElement.style.display='none'}">` +
                         '</div>' +
                         `<div class="number" style="font-size:${FONT}vw">${s}</div>`;
                     num++;
@@ -278,5 +346,161 @@
         })();
     </script>
 
+    <!-- MediaPipe Vision CDN -->
+    <script type="module">
+        import { FaceDetector, FilesetResolver }
+            from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs';
+
+        const eyeContainer = document.getElementById('eyeContainer');
+        const eyeVideo = document.getElementById('eyeVideo');
+        const eyeball = document.getElementById('eyeball');
+        const webcam = document.getElementById('webcam');
+
+        // 眼球追蹤參數
+        const MAX_SHIFT_PX = 30;     // 眼球最大位移 px
+        const SMOOTH = 0.12;         // 平滑係數（越小越滑順）
+        let curX = 0, curY = 0;      // 當前位移
+        let targetX = 0, targetY = 0;
+        let isTracking = false;
+        let lostFrames = 0;
+        const LOST_THRESHOLD = 10;   // 連續幾幀沒偵測到才回正
+
+        async function init() {
+            // 1. 初始化 MediaPipe Face Detector
+            const vision = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+            );
+            const detector = await FaceDetector.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath:
+                        'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+                    delegate: 'CPU'
+                },
+                runningMode: 'VIDEO',
+                minDetectionConfidence: 0.5
+            });
+
+            // 2. 嘗試開啟攝影機
+            let hasCam = false;
+            try {
+                const stream = await navigator.mediaDevices
+                    .getUserMedia({ video: { width: 320, height: 240 } });
+                webcam.srcObject = stream;
+                await webcam.play();
+                hasCam = true;
+            } catch (e) {
+                console.warn('無法取得攝影機，改用滑鼠追蹤:', e);
+            }
+
+            // 3a. 攝影機偵測迴圈
+            if (hasCam) {
+                let lastTime = -1;
+                function detect() {
+                    if (webcam.readyState < 2) {
+                        requestAnimationFrame(detect);
+                        return;
+                    }
+                    const now = performance.now();
+                    if (now === lastTime) {
+                        requestAnimationFrame(detect);
+                        return;
+                    }
+                    lastTime = now;
+
+                    const results = detector.detectForVideo(webcam, now);
+
+                    if (results.detections.length > 0) {
+                        lostFrames = 0;
+                        if (!isTracking) {
+                            isTracking = true;
+                            eyeContainer.classList.add('tracking');
+                        }
+                        const face = results.detections.reduce((a, b) =>
+                            (a.boundingBox.width * a.boundingBox.height >
+                                b.boundingBox.width * b.boundingBox.height)
+                                ? a : b
+                        );
+                        const bb = face.boundingBox;
+                        const fx = 1 - (bb.originX + bb.width / 2) / webcam.videoWidth;
+                        const fy = (bb.originY + bb.height / 2) / webcam.videoHeight;
+                        targetX = (fx - 0.5) * 2 * MAX_SHIFT_PX;
+                        targetY = (fy - 0.5) * 2 * MAX_SHIFT_PX * 0.4;
+                    } else {
+                        lostFrames++;
+                        if (lostFrames > LOST_THRESHOLD && isTracking) {
+                            isTracking = false;
+                            eyeContainer.classList.remove('tracking');
+                            targetX = 0;
+                            targetY = 0;
+                        }
+                    }
+                    curX += (targetX - curX) * SMOOTH;
+                    curY += (targetY - curY) * SMOOTH;
+                    eyeball.style.transform = `translate(calc(-50% + ${curX}px), calc(-50% + ${curY}px))`;
+                    requestAnimationFrame(detect);
+                }
+                detect();
+                console.log('眼球追蹤已啟動（攝影機模式）');
+            }
+
+            // 3b. 滑鼠追蹤（備案 or 同時啟用）
+            eyeContainer.classList.add('tracking');
+
+            // 閒置切換：滑鼠動→眼球追蹤，閒置→影片動畫
+            const IDLE_TIME = 3000;
+            let idleTimer = null;
+
+            function goIdle() {
+                // 顯示影片，蓋住眼球
+                eyeVideo.classList.remove('hidden');
+                eyeVideo.currentTime = 0;
+                eyeVideo.play().catch(() => { });
+                // 眼球回中間
+                targetX = 0;
+                targetY = 0;
+            }
+
+            function goTracking() {
+                // 隱藏影片，露出眼球追蹤
+                eyeVideo.classList.add('hidden');
+            }
+
+            function resetIdleTimer() {
+                goTracking();
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(goIdle, IDLE_TIME);
+            }
+
+            // 初始顯示影片
+            resetIdleTimer();
+
+            document.addEventListener('mousemove', (e) => {
+                const mx = e.clientX / window.innerWidth;
+                const my = e.clientY / window.innerHeight;
+                if (!hasCam) {
+                    targetX = (mx - 0.5) * 2 * MAX_SHIFT_PX;
+                    targetY = (my - 0.5) * 2 * MAX_SHIFT_PX * 0.4;
+                }
+                resetIdleTimer();
+            });
+
+            // 無攝影機時的動畫迴圈
+            if (!hasCam) {
+                function animateMouse() {
+                    curX += (targetX - curX) * SMOOTH;
+                    curY += (targetY - curY) * SMOOTH;
+                    eyeball.style.transform =
+                        `translate(calc(-50% + ${curX}px), calc(-50% + ${curY}px))`;
+                    requestAnimationFrame(animateMouse);
+                }
+                animateMouse();
+                console.log('眼球追蹤已啟動（滑鼠模式）');
+            }
+        }
+
+        init();
+    </script>
+
 </body>
+
 </html>

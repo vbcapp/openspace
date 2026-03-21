@@ -1,5 +1,5 @@
 /* ================================================================
-   answer.js — 掃碼作答頁 (T-017)
+   answer.js — 掃碼作答頁 (T-017)  1-BIT TERMINAL STYLE
    路由: #/answer/:questionId
    ================================================================ */
 
@@ -22,14 +22,14 @@ async function renderAnswerPage(params) {
   container.innerHTML = `
     <header class="layout-mobile__header">
       <button class="btn btn--ghost" id="ansBackBtn" style="font-size:var(--text-xs);padding:var(--space-1) var(--space-2);">
-        &larr; 返回
+        &larr; ABORT
       </button>
-      <span class="layout-mobile__header-title">作答</span>
+      <span class="layout-mobile__header-title">RESPOND</span>
       <span></span>
     </header>
     <main class="layout-mobile__content" id="ansContent">
       <div style="text-align:center;padding:var(--space-8) 0;">
-        <div class="subtitle-cyber">載入中...</div>
+        <div class="blink" style="font-family:var(--font-terminal);color:var(--color-blood-red);">LOADING...</div>
       </div>
     </main>
   `;
@@ -49,24 +49,27 @@ async function _initAnswerPage() {
   if (!content) return;
 
   try {
-    // 載入題目資訊（含區域）
     _answerQuestion = await QuestionsAPI.getQuestion(_answerQuestionId);
     if (!_answerQuestion) {
       content.innerHTML = `
-        <div class="ans-error-state">
-          <div class="subtitle-cyber">找不到題目</div>
-          <p>此題目不存在或已被刪除</p>
-          <button class="btn btn--ghost" onclick="Router.navigate('profile')">返回個人頁</button>
+        <div class="terminal-wrapper" style="margin:0 auto;">
+          <div class="terminal-header">
+            <span>ERROR</span>
+            <span style="font-size:0.8rem;">404</span>
+          </div>
+          <div class="terminal-content" style="text-align:center;padding:2rem;">
+            <div style="font-size:1.2rem;font-weight:bold;margin-bottom:12px;">QUESTION NOT FOUND</div>
+            <div style="font-size:0.85rem;opacity:0.7;margin-bottom:16px;">此題目不存在或已被刪除</div>
+            <button class="action-btn" onclick="Router.navigate('profile')">[RETURN]</button>
+          </div>
         </div>
       `;
       return;
     }
 
-    // 檢查議會代表身份
     const _ansProfile = await UsersAPI.getCurrentProfile();
     const _ansIsParliament = _ansProfile && _ansProfile.delegate_status === 'parliament';
 
-    // 議會代表才載入已有答案
     if (_ansIsParliament) {
       _existingAnswer = await AnswersAPI.getMyAnswer(_answerQuestionId);
     }
@@ -75,9 +78,14 @@ async function _initAnswerPage() {
   } catch (err) {
     console.error('_initAnswerPage:', err);
     content.innerHTML = `
-      <div class="ans-error-state">
-        <div class="subtitle-cyber">載入失敗</div>
-        <p>載入失敗，請重新整理頁面</p>
+      <div class="terminal-wrapper" style="margin:0 auto;">
+        <div class="terminal-header">
+          <span>SYSTEM ERROR</span>
+        </div>
+        <div class="terminal-content" style="text-align:center;padding:2rem;">
+          <div style="font-size:1.1rem;font-weight:bold;">LOAD FAILED</div>
+          <div style="font-size:0.85rem;opacity:0.7;margin-top:8px;">載入失敗，請重新整理頁面</div>
+        </div>
       </div>
     `;
   }
@@ -91,114 +99,134 @@ function _renderAnswerForm(content, isParliament) {
   const isEdit = !!_existingAnswer;
   const updatedAt = _existingAnswer?.updated_at || _existingAnswer?.created_at;
 
+  // Parse zone name parts
+  const nameParts = zoneName.split(' // ');
+  const enName = nameParts[0] || zoneName;
+  const zhName = nameParts[1] || '';
+
+  // Zone logo
+  const zoneId = q.zone_id || q.zones?.id;
+  const logo = (typeof _ZONE_LOGOS !== 'undefined' && zoneId) ? _ZONE_LOGOS[zoneId] : null;
+  const isCross = zoneId === 8;
+
+  const logoHtml = isCross
+    ? `<div style="width:40px;height:40px;flex-shrink:0;border:2px solid var(--color-blood-red);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:bold;color:var(--color-blood-red);">X</div>`
+    : (logo
+      ? `<img class="zone-logo" src="${logo}" alt="${_escapeHtml(enName)}">`
+      : '');
+
   content.innerHTML = `
-    <!-- 區域資訊 -->
-    <div class="ans-zone-badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-      </svg>
-      ${_escapeHtml(zoneName)}
-    </div>
-
-    <!-- 題目卡片 -->
-    <div class="ans-question-card">
-      <div class="ans-question-card__label">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-        題目
+    <div class="terminal-wrapper scan-line-anim" style="margin:0 auto;">
+      <div class="terminal-header">
+        <span>RESPOND // 作答</span>
+        <span style="font-size:0.8rem;">${isEdit ? '[EDIT MODE]' : '[NEW]'}</span>
       </div>
-      <p class="ans-question-card__text">${_escapeHtml(q.content)}</p>
-    </div>
 
-    ${!isParliament ? `
-    <!-- 備選代表預覽提示 -->
-    <div class="ans-preview-notice">
-      <span class="badge badge--delegate-alt">備選代表</span>
-      <p>僅議會代表可提交答案</p>
-    </div>
-    ` : `
-    <!-- 作答表單 -->
-    <div class="ans-form">
-      ${isEdit ? `
-        <div class="ans-edit-notice">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          你已作答過此題，可修改答案
-          <span class="ans-edit-notice__time">${_ansFormatTime(updatedAt)}</span>
+      <div class="terminal-content">
+        <!-- Zone Display -->
+        <div class="zone-display">
+          ${logoHtml}
+          <div class="zone-info">
+            <div class="zone-label-1bit">${_escapeHtml(enName)}</div>
+            ${zhName ? `<div class="zone-sub">${_escapeHtml(zhName)}</div>` : ''}
+          </div>
         </div>
-      ` : ''}
 
-      <div class="form-field">
-        <label class="form-field__label">你的答案</label>
-        <textarea
-          class="textarea"
-          id="ansTextarea"
-          rows="6"
-          placeholder="輸入你的答案..."
-          maxlength="1000"
-        >${_escapeHtml(existingContent)}</textarea>
-        <span class="form-field__hint" id="ansCharCount">${existingContent.length} / 1000</span>
+        <!-- Question Display -->
+        <div class="output-text" id="ansQuestionText">${renderQuestionHtml(q.content)}</div>
+
+        ${!isParliament ? `
+        <!-- Alternate Delegate Notice -->
+        <div style="border:2px dashed var(--color-blood-red);padding:16px;text-align:center;margin-top:12px;">
+          <div style="font-size:1rem;font-weight:bold;text-transform:uppercase;margin-bottom:6px;">[ACCESS DENIED]</div>
+          <div style="font-size:0.85rem;opacity:0.7;">備選代表 — 僅議會代表可提交答案</div>
+        </div>
+        ` : `
+        <!-- Answer Form -->
+        <div id="ansFormSection">
+          ${isEdit ? `
+          <div style="border:1px dashed var(--color-blood-red);padding:8px 12px;margin-bottom:12px;font-size:0.8rem;opacity:0.7;display:flex;align-items:center;gap:6px;">
+            <span>[!]</span>
+            <span>已作答 — 可修改答案</span>
+            <span style="margin-left:auto;">${_ansFormatTime(updatedAt)}</span>
+          </div>
+          ` : ''}
+
+          <div style="margin-bottom:8px;">
+            <div style="font-size:0.85rem;text-transform:uppercase;margin-bottom:6px;opacity:0.7;">// YOUR RESPONSE</div>
+            <textarea
+              class="textarea"
+              id="ansTextarea"
+              rows="6"
+              placeholder="輸入你的答案..."
+              maxlength="1000"
+              style="font-size:1rem;"
+            >${_escapeHtml(existingContent)}</textarea>
+            <div style="font-size:0.75rem;opacity:0.5;text-align:right;margin-top:4px;" id="ansCharCount">${existingContent.length} / 1000</div>
+          </div>
+
+          <div id="ansError" style="display:none;text-align:center;margin-bottom:8px;font-size:0.9rem;border:1px solid var(--color-blood-red);padding:6px;"></div>
+
+          <button class="action-btn" id="ansSubmitBtn">
+            ${isEdit ? '[UPDATE] 更新答案' : '[SUBMIT] 提交答案'}
+          </button>
+        </div>
+
+        <!-- Success State -->
+        <div id="ansSuccess" style="display:none;text-align:center;padding:1.5rem 0;">
+          <div style="font-size:2rem;font-weight:bold;margin-bottom:8px;">TRANSMITTED</div>
+          <div class="blink" style="font-size:0.9rem;margin-bottom:16px;">/// 答案已成功${isEdit ? '更新' : '提交'} ///</div>
+
+          <div class="counter-display" style="margin-bottom:16px;">
+            <span>STATUS: COMPLETE</span>
+            <span>Q-${_answerQuestionId?.slice(0, 8) || '???'}</span>
+          </div>
+
+          <div style="display:flex;gap:8px;">
+            <button class="action-btn" id="ansEditAgainBtn" style="font-size:1rem;">[EDIT] 繼續修改</button>
+            <button class="action-btn" id="ansBackToProfile" style="font-size:1rem;background:var(--color-blood-red);color:#000;">[RETURN] 返回</button>
+          </div>
+        </div>
+        `}
+
+        <!-- Counter -->
+        <div class="counter-display">
+          <span>Q-ID: ${_answerQuestionId?.slice(0, 8) || '???'}</span>
+          <span>ZONE: ${_escapeHtml(enName)}</span>
+        </div>
       </div>
-
-      <div id="ansError" class="form-field__error" style="display:none;text-align:center;margin-bottom:var(--space-3);"></div>
-
-      <button class="btn btn--primary btn--full" id="ansSubmitBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        ${isEdit ? '更新答案' : '提交答案'}
-      </button>
     </div>
-
-    <!-- 成功狀態（隱藏） -->
-    <div id="ansSuccess" class="ans-success" style="display:none;">
-      <div class="ans-success__icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
-      </div>
-      <div class="subtitle-cyber">作答完成</div>
-      <p>答案已成功${isEdit ? '更新' : '提交'}</p>
-      <div class="ans-success__actions">
-        <button class="btn btn--ghost" id="ansEditAgainBtn">繼續修改</button>
-        <button class="btn btn--secondary" id="ansBackToProfile">返回個人頁</button>
-      </div>
-    </div>
-    `}
   `;
+
+  // Run scrambler on question text
+  const qTextEl = document.getElementById('ansQuestionText');
+  if (qTextEl) {
+    const rawText = typeof stripQuestionHtml === 'function' ? stripQuestionHtml(q.content) : q.content.replace(/<[^>]*>/g, '');
+    const htmlContent = renderQuestionHtml(q.content);
+    const scrambler = new Scrambler(qTextEl);
+    scrambler.run(rawText, htmlContent);
+  }
 
   if (isParliament) _bindAnswerEvents();
 }
 
 function _bindAnswerEvents() {
-  // 字數計算
   const textarea = document.getElementById('ansTextarea');
   const charCount = document.getElementById('ansCharCount');
   if (textarea && charCount) {
     textarea.addEventListener('input', () => {
       const len = textarea.value.length;
       charCount.textContent = `${len} / 1000`;
-      if (len > 1000) charCount.style.color = 'var(--color-error)';
-      else charCount.style.color = 'var(--color-text-muted)';
+      if (len > 1000) charCount.style.color = '#ff0000';
+      else charCount.style.color = '';
     });
   }
 
-  // 提交
   document.getElementById('ansSubmitBtn')?.addEventListener('click', () => _submitAnswer());
 
-  // 成功後操作
   document.getElementById('ansEditAgainBtn')?.addEventListener('click', () => {
     document.getElementById('ansSuccess').style.display = 'none';
-    const form = document.querySelector('.ans-form');
+    const form = document.getElementById('ansFormSection');
     if (form) form.style.display = 'block';
   });
 
@@ -215,48 +243,45 @@ async function _submitAnswer() {
 
   const text = textarea.value.trim();
 
-  // 驗證
   if (!text) {
     if (errorEl) {
-      errorEl.textContent = '請輸入答案內容';
+      errorEl.textContent = '[ERROR] 請輸入答案內容';
       errorEl.style.display = 'block';
     }
-    textarea.classList.add('input--error');
+    textarea.style.borderColor = '#ff0000';
     return;
   }
 
   if (text.length > 1000) {
     if (errorEl) {
-      errorEl.textContent = '答案不可超過 1000 字';
+      errorEl.textContent = '[ERROR] 答案不可超過 1000 字';
       errorEl.style.display = 'block';
     }
     return;
   }
 
-  // 清除錯誤
-  textarea.classList.remove('input--error');
+  textarea.style.borderColor = '';
   if (errorEl) errorEl.style.display = 'none';
 
   btn.disabled = true;
-  btn.textContent = '提交中...';
+  btn.textContent = 'TRANSMITTING...';
 
   try {
     const answer = await AnswersAPI.submitAnswer(_answerQuestionId, text);
     _existingAnswer = answer;
 
-    // 顯示成功狀態
-    const form = document.querySelector('.ans-form');
+    const form = document.getElementById('ansFormSection');
     const success = document.getElementById('ansSuccess');
     if (form) form.style.display = 'none';
     if (success) success.style.display = 'block';
   } catch (err) {
     console.error('_submitAnswer:', err);
     if (errorEl) {
-      errorEl.textContent = '提交失敗：' + (err.message || '未知錯誤');
+      errorEl.textContent = '[FAIL] ' + (err.message || '未知錯誤');
       errorEl.style.display = 'block';
     }
     btn.disabled = false;
-    btn.textContent = _existingAnswer ? '更新答案' : '提交答案';
+    btn.textContent = _existingAnswer ? '[UPDATE] 更新答案' : '[SUBMIT] 提交答案';
   }
 }
 

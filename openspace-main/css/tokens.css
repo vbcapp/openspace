@@ -4,8 +4,8 @@
 
 :root {
 
-  /* ── 色彩：品牌核心 ── */
-  --color-blood-red: #ff003c;
+  /* ── 色彩：品牌核心（1-BIT Nuclear Red） ── */
+  --color-blood-red: #FF3F00;
   --color-dark-red: #1a0005;
   --color-cyber-cyan: #00f3ff;
   --color-cyber-magenta: #ff00e6;
@@ -42,10 +42,16 @@
   --color-error: var(--color-blood-red);
   --color-info: var(--color-cyber-cyan);
 
-  /* ── 字體家族 ── */
+  /* ── 字體家族（1-BIT 終端風格優先） ── */
   --font-display: 'Anton', sans-serif;
-  --font-ui: 'Oswald', sans-serif;
-  --font-mono: 'Courier New', monospace;
+  --font-ui: 'VT323', 'Noto Sans TC', monospace;
+  --font-mono: 'VT323', 'Courier New', monospace;
+  --font-terminal: 'VT323', 'Noto Sans TC', monospace;
+
+  /* ── 1-BIT 主題色 ── */
+  --color-1bit-red: #FF3F00;
+  --color-1bit-bg: #000000;
+  --color-1bit-shadow: rgba(255, 63, 0, 0.3);
 
   /* ── 字體大小 ── */
   --text-2xs: 0.625rem;
